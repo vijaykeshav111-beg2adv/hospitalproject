@@ -1,22 +1,68 @@
-# Vijay Vargiya Group of Hospitals - Backend Requirements
+# ============================================================================
+#  Vijay Vargiya Group of Hospitals - backend requirements
+#  install:  pip install -r requirements.txt
+#
+#  Core = everything the FastAPI app, the UI, billing PDFs and the AI front
+#  desk need. The optional extras at the bottom are only for the machine
+#  learning / MCP scratchpads that live in src/, ml_templates/, nlp_pretrained/,
+#  medical_mcp/ and mcp_server_ecom/ - the hospital app itself does not import
+#  them, so they are commented out to keep installs fast and portable.
+# ============================================================================
+
+# ---- web framework ----
 fastapi>=0.115
 uvicorn[standard]>=0.30
+python-multipart>=0.0.9        # form / file-upload parsing (prescriptions, medical files)
+
+# ---- validation ----
+# pydantic[email]: app/schemas.py uses EmailStr, which needs this at import time
+# or the whole app fails to start with "email-validator is not installed".
+email-validator>=2.0
+
+# ---- database (MySQL is mandatory - there is no SQLite fallback) ----
 sqlalchemy>=2.0
 pymysql>=1.1
-cryptography>=42.0
-PyJWT>=2.8
-python-multipart>=0.0.9
-jinja2>=3.1
-APScheduler>=3.10
-reportlab>=4.0
-python-dotenv>=1.0
-# optional: Twilio WhatsApp provider
-# twilio>=9.0
+cryptography>=42.0             # required by pymysql for caching_sha2_password / TLS
 
-pandas>=2.0
-numpy>=1.26
-scikit-learn>=1.4
-gensim>=4.3
-nltk>=3.8
+# ---- security ----
+PyJWT>=2.8
+
+# ---- templating (server-rendered portals) ----
+jinja2>=3.1
+
+# ---- background jobs ----
+APScheduler>=3.10
+
+# ---- documents (prescription / invoice / receipt PDFs) ----
+reportlab>=4.0
+
+# ---- configuration ----
+python-dotenv>=1.0
+
+# ---- AI front desk (optional at runtime) ----
+# The assistant works with zero API keys (AI_MODE=local). Install this and set
+# GROQ_API_KEY in .env to get AI_MODE=hybrid (natural-language wording) or
+# AI_MODE=groq (full tool-calling conversation).
 groq>=1.7
-fastmcp>=2.0
+
+# ---- tests / tooling ----
+httpx>=0.27                    # required by fastapi.testclient (tests/smoke_test.py)
+
+
+# ============================================================================
+#  OPTIONAL extras - ML Workshop & MCP servers (not needed by app/)
+#
+#  The ML Workshop (/ml, /predict, src/, nlp_pretrained/) is part of this
+#  project and stays runnable, but its heavy dependencies are kept out of the
+#  core install so `pip install -r requirements.txt` stays fast and portable.
+#
+#  To run the ML / pretrained-NLP parts:
+#      pip install -r requirements.txt -r requirements-ml.txt
+#      python nlp_pretrained/download_nltk_data.py
+#
+#  For the MCP scratchpads (medical_mcp/, mcp_server_ecom/):
+#      pip install fastmcp
+# ============================================================================
+
+# ---- WhatsApp (Twilio) - uncomment to send real WhatsApp messages ----
+# twilio>=9.0

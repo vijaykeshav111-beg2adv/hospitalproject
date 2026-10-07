@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
+from ..config import settings
 from ..database import get_db
 from ..deps import CurrentUser, audit, get_current_user, patient_for_user, require_permission
 from ..security import utcnow
@@ -94,6 +95,51 @@ def retry(notification_id: int, request: Request, db: Session = Depends(get_db),
     return notif
 
 
+@router.post("/test-email", summary="Send a test email using the SMTP settings in .env")
+def test_email(request: Request, to: str | None = None, db: Session = Depends(get_db),
+               user: CurrentUser = Depends(require_permission("notifications:write", "settings:manage",
+                                                               any_of=True))):
+    """Verify the EMAIL setup in one click (ADMIN).
+
+    Sends one plain message through the configured SMTP server and reports
+    exactly what the server said, so the settings can be fixed without
+    guessing. It never touches patient data.
+    """
+    target = (to or user.email or "").strip()
+    if not target:
+        raise HTTPException(status_code=422, detail="No recipient - pass ?to=someone@example.com")
+
+    if not settings.email_enabled:
+        return {
+            "ok": False,
+            "to": target,
+            "smtp_host": settings.smtp_host,
+            "smtp_port": settings.smtp_port,
+            "detail": "EMAIL_ENABLED is false in .env - set EMAIL_ENABLED=true and restart the server",
+        }
+
+    ok, reference, error = notify._send_email(
+        target,
+        f"{settings.app_name} - email test",
+        (f"This is a test email from {settings.app_name}.\n\n"
+         f"Sent by: {user.full_name} ({user.role})\n"
+         f"Time:    {utcnow().isoformat(timespec='seconds')}\n\n"
+         "If you can read this, appointment / payment / prescription notifications "
+         "will also reach patients by email."),
+    )
+    audit(db, action="NOTIFICATION_TEST_EMAIL", resource="notification", user=user, request=request,
+          new_value={"to": target, "ok": bool(ok), "error": error})
+    return {
+        "ok": bool(ok),
+        "to": target,
+        "smtp_host": settings.smtp_host,
+        "smtp_port": settings.smtp_port,
+        "from": settings.email_from,
+        "reference": reference,
+        "detail": error or "Sent - check the inbox (and the spam folder).",
+    }
+
+
 @router.get("/templates", summary="WhatsApp / Email templates")
 def templates(_: CurrentUser = Depends(require_permission("notifications:read"))):
     return [{"name": name, "preview": body[:200]} for name, body in notify.TEMPLATES.items()]
@@ -110,8 +156,16 @@ def stats(db: Session = Depends(get_db), days: int = 30,
     ).all()
     pending = db.scalar(select(func.count(models.Notification.id)).where(
         models.Notification.status == "PENDING")) or 0
+    by_channel: dict[str, int] = {}
+    for channel, _status, count in rows:
+        by_channel[channel] = by_channel.get(channel, 0) + count
     return {"window_days": days, "pending": pending,
-            "breakdown": [{"channel": c, "status": s, "count": n} for c, s, n in rows]}
+            "breakdown": [{"channel": c, "status": s, "count": n} for c, s, n in rows],
+            "by_channel": by_channel,
+            # so the System page can show which delivery channels are actually on
+            "email_enabled": settings.email_enabled,
+            "whatsapp_enabled": settings.whatsapp_enabled,
+            "available_channels": notify.available_channels(["WHATSAPP", "IN_APP"])}
 
 
 # ==========================================================================

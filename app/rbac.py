@@ -145,3 +145,48 @@ def permissions_for_role(role: str) -> list[str]:
     if "*" in granted:
         return list(ALL_PERMISSIONS)
     return granted
+
+
+# --------------------------------------------------------------------------
+# Page -> roles  (the HTML portals, mirrored by page_guard() in app/web.py)
+#
+# Keeping this table here means the guard, the navigation bar and the
+# /ui/access matrix page can never disagree. SUPER_ADMIN is always allowed by
+# page_guard() on top of whatever is listed, so it is written explicitly only
+# where it is the *only* way in.
+# --------------------------------------------------------------------------
+PAGE_ROLES: dict[str, tuple[str, ...]] = {
+    "/ui/super-admin":  ("SUPER_ADMIN",),
+    "/ui/admin":        ("ADMIN",),
+    "/ui/doctor":       ("DOCTOR",),
+    "/ui/reception":    ("RECEPTIONIST",),
+    "/ui/billing":      ("ACCOUNTANT",),
+    "/ui/patient":      ("PATIENT",),
+    "/ui/clinical":     ("DOCTOR", "ADMIN"),
+    "/ui/book":         ("PATIENT", "RECEPTIONIST", "ADMIN"),
+    "/ui/patients":     ("DOCTOR", "RECEPTIONIST", "ADMIN"),
+    "/ui/appointments": ("PATIENT", "DOCTOR", "RECEPTIONIST", "ADMIN"),
+    "/ui/ai-chat":      ("PATIENT", "DOCTOR", "RECEPTIONIST", "ACCOUNTANT", "ADMIN"),
+    "/ui/ai-monitor":   ("ADMIN",),
+    "/ui/security":     ("ADMIN",),
+    "/ui/access":       ("ADMIN",),
+    "/ui/system":       ("ADMIN",),
+}
+
+PAGE_LABELS: dict[str, str] = {
+    "/ui/super-admin":  "Super Admin dashboard - every role's data, security summary, system health",
+    "/ui/admin":        "Hospital dashboard - today's OPD, revenue, staff, reviews, analytics",
+    "/ui/doctor":       "Doctor console - own schedule, patients, follow-ups, pending fees",
+    "/ui/reception":    "Reception desk - queue control, check-in/out, pending payments",
+    "/ui/billing":      "Billing & payments - invoices, collection, refunds, receipts",
+    "/ui/patient":      "Patient portal - appointments, records, prescriptions, bills, AI chat",
+    "/ui/clinical":     "Clinical workspace - consultation notes, prescriptions, files",
+    "/ui/book":         "Appointment booking (patient or on someone's behalf)",
+    "/ui/patients":     "Patient master - search, register, history",
+    "/ui/appointments": "Appointment list - today / upcoming / past",
+    "/ui/ai-chat":      "AI front desk chat",
+    "/ui/ai-monitor":   "AI monitor - conversations, routing, escalations, tools, safety",
+    "/ui/security":     "Audit log, login activity, sessions, security summary",
+    "/ui/access":       "This page - role x permission matrix",
+    "/ui/system":       "System - background jobs, scheduler, configuration health",
+}

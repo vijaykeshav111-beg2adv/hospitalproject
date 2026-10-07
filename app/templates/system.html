@@ -21,6 +21,21 @@
 </div>
 
 <div class="card">
+  <h3>Notification channels</h3>
+  <p class="muted small">
+    WhatsApp aur Email ki setting <code>.env</code> se aati hai. Yahan se aap turant test bhej kar
+    check kar sakte ho ki patient ko notification pahunchega ya nahi.
+  </p>
+  <div class="row">
+    <input id="testTo" placeholder="email address (khali = apna login email)" style="max-width:300px"/>
+    <button class="btn" onclick="sendTestEmail()">Send test email</button>
+    <button class="btn ghost" onclick="load()">Refresh flags</button>
+  </div>
+  <div id="emailMsg" class="small" style="margin-top:10px"></div>
+  <div id="channels" class="small muted" style="margin-top:10px"></div>
+</div>
+
+<div class="card">
   <h3>Recent job runs</h3>
   <div id="runs" class="small muted">Loading…</div>
 </div>
@@ -29,6 +44,22 @@
 {% block scripts %}
 <script>
 if (guard()) load();
+
+async function sendTestEmail() {
+  const box = document.getElementById('emailMsg');
+  const to = document.getElementById('testTo').value.trim();
+  box.innerHTML = 'Sending…';
+  try {
+    const r = await api('/notifications/test-email' + (to ? '?to=' + encodeURIComponent(to) : ''),
+                        {method: 'POST'});
+    box.innerHTML = r.ok
+      ? '<span class="badge ok">Email sent</span> <span class="muted">' + fmt.esc(r.to) +
+        ' · ' + fmt.esc(r.smtp_host) + ':' + r.smtp_port + ' · ' + fmt.esc(r.detail) + '</span>'
+      : '<span class="badge bad">Not sent</span> <span class="muted">' + fmt.esc(r.detail) + '</span>';
+  } catch (e) {
+    box.innerHTML = '<span class="badge bad">' + fmt.esc(e.message) + '</span>';
+  }
+}
 
 async function load() {
   try {
@@ -40,6 +71,14 @@ async function load() {
       <div class="muted">${fmt.esc(h.database.database || h.database.error || '')}</div>`;
 
     const sys = await api('/admin/system');
+    try {
+      const st = await api('/notifications/stats?days=30');
+      document.getElementById('channels').innerHTML =
+        'channels: ' + Object.entries(st.by_channel || {}).map(([k, v]) => k + ' ' + v).join(' · ') +
+        ' &nbsp;|&nbsp; email in .env: <b>' + (st.email_enabled ? 'ENABLED' : 'disabled') + '</b>' +
+        ' &nbsp;|&nbsp; whatsapp: <b>' + (st.whatsapp_enabled ? 'ENABLED' : 'disabled (console)') + '</b>';
+    } catch (e) { /* stats are optional */ }
+
     document.getElementById('tables').innerHTML = Object.entries(sys.tables).sort((a,b)=>b[1]-a[1])
       .map(([k,v]) => `<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line)">
         <code>${k}</code><b>${fmt.n(v)}</b></div>`).join('');

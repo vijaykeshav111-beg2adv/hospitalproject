@@ -36,6 +36,7 @@ PROTECTED_PAGES = {
     "/ui/reception": "RECEPTIONIST",
     "/ui/billing": "ACCOUNTANT",
     "/ui/clinical": "DOCTOR",
+    "/ui/access": "ADMIN",
     "/ui/book": "RECEPTIONIST",
     "/ui/patients": "RECEPTIONIST",
     "/ui/appointments": "RECEPTIONIST",
@@ -189,6 +190,69 @@ def main(argv: list[str] | None = None) -> int:
             for suffix in ("receipt", "pdf"):
                 st, body, _ = request(base, f"/api/v1/invoices/{invoice_id}/{suffix}?token={token}")
                 check(f"invoice {suffix} PDF with ?token=", st == 200 and body[:4] == b"%PDF", f"status={st}")
+
+    # ------------------------------------------------------------------
+    # The demo logins printed on the login page must really work. This is the
+    # guard for the bug where three of the six emails used a different domain
+    # ("@vijayvargiyahospital.in") than the seeded users, so doctor / reception /
+    # accounts demo logins always failed with "Invalid email or password".
+    print("\nDemo logins advertised on /ui/login")
+    status, raw, _ = request(base, "/ui/login")
+    login_html = raw.decode("utf-8", "replace")
+    advertised = re.findall(r"'([\w.+-]+@[\w.-]+)',\s*\n?\s*'([^']+)'", login_html)
+    if not advertised:
+        # the templates are generated with one pair per line - fall back to a
+        # loose scan of the demos array
+        block = login_html.split("const demos", 1)[-1].split("];", 1)[0]
+        pairs = re.findall(r"'([^']+)'", block)
+        advertised = [(pairs[i], pairs[i + 1]) for i in range(0, len(pairs) - 1, 2)]
+    check("the login page advertises the demo accounts", len(advertised) >= 6,
+          f"found {len(advertised)}")
+    for email, password in advertised[:8]:
+        st, body, _ = request(base, "/api/v1/auth/login", "POST",
+                              {"email": email, "password": password})
+        check(f"demo login works: {email}", st == 200, f"status={st} {body[:60]!r}")
+
+    # ------------------------------------------------------------------
+    # /ui/access + /api/v1/auth/roles/matrix must agree with the page guards
+    print("\nRole access matrix")
+    if token:
+        st, body, _ = request(base, "/api/v1/auth/roles/matrix", token=token)
+        check("GET /api/v1/auth/roles/matrix", st == 200, f"status={st}")
+        if st == 200:
+            matrix = json.loads(body)
+            names = {p["name"] for p in matrix.get("permissions", [])}
+            pages = {p["path"] for p in matrix.get("pages", [])}
+            check("matrix lists the roles", len(matrix.get("roles", [])) == 6, str(matrix.get("roles")))
+            check("matrix lists permissions", len(names) >= 40, f"{len(names)} permissions")
+            check("matrix covers every protected page",
+                  set(PROTECTED_PAGES) <= pages, f"missing {set(PROTECTED_PAGES) - pages}")
+            by_name = {p["name"]: p["roles"] for p in matrix["permissions"]}
+            check("payments:write -> reception/accountant, not doctor",
+                  "RECEPTIONIST" in by_name.get("payments:write", [])
+                  and "DOCTOR" not in by_name.get("payments:write", []),
+                  str(by_name.get("payments:write")))
+            access_html = request(base, "/ui/access", cookie=f"vvh_access_token={token}")[1].decode("utf-8", "replace")
+            check("/ui/access renders the matrix", "Role access matrix" in access_html)
+
+    # ------------------------------------------------------------------
+    # Round 5: the chat upload / verify UI must actually be served, and the
+    # document endpoints must answer for the right roles.
+    print("\nChat document upload (round 5)")
+    if tokens.get("PATIENT"):
+        st, body, _ = request(base, "/ui/ai-chat", cookie=f"vvh_access_token={tokens['PATIENT']}")
+        chat_html = body.decode("utf-8", "replace")
+        for needle in ("fileInput", "onFilePicked", "uploadFile", "consultDoctor",
+                       "Files in this chat", "Parchi / report / X-ray"):
+            check(f"/ui/ai-chat ships {needle!r}", needle in chat_html)
+        st, body, _ = request(base, "/ui/doctor", cookie=f"vvh_access_token={tokens['DOCTOR']}")
+        doc_html = body.decode("utf-8", "replace")
+        for needle in ("loadReview", "verifyFile", "Documents sent in chat", "Correct karein"):
+            check(f"/ui/doctor ships {needle!r}", needle in doc_html)
+        st, body, _ = request(base, "/api/v1/ai/files/review", token=tokens["DOCTOR"])
+        check("GET /api/v1/ai/files/review (doctor)", st == 200, f"status={st} {body[:80]!r}")
+        st, _, _ = request(base, "/api/v1/ai/files/review", token=tokens["PATIENT"])
+        check("GET /api/v1/ai/files/review (patient -> 403)", st == 403, f"status={st}")
 
     print(f"\nRESULT: {passed} passed, {failed} failed")
     return 1 if failed else 0

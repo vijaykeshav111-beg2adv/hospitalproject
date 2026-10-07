@@ -14,6 +14,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from .config import settings
+from . import rbac
+
 from .deps import CurrentUser, get_optional_user
 
 templates = Jinja2Templates(
@@ -178,7 +180,7 @@ def reset_page(request: Request):
 def super_admin_dashboard(
     request: Request,
     _: CurrentUser = Depends(
-        page_guard("SUPER_ADMIN")
+        page_guard(*rbac.PAGE_ROLES["/ui/super-admin"])
     ),
 ):
 
@@ -196,7 +198,7 @@ def super_admin_dashboard(
 def admin_dashboard(
     request: Request,
     _: CurrentUser = Depends(
-        page_guard("ADMIN")
+        page_guard(*rbac.PAGE_ROLES["/ui/admin"])
     ),
 ):
 
@@ -214,7 +216,7 @@ def admin_dashboard(
 def doctor_dashboard(
     request: Request,
     _: CurrentUser = Depends(
-        page_guard("DOCTOR")
+        page_guard(*rbac.PAGE_ROLES["/ui/doctor"])
     ),
 ):
 
@@ -232,7 +234,7 @@ def doctor_dashboard(
 def patient_dashboard(
     request: Request,
     _: CurrentUser = Depends(
-        page_guard("PATIENT")
+        page_guard(*rbac.PAGE_ROLES["/ui/patient"])
     ),
 ):
 
@@ -250,7 +252,7 @@ def patient_dashboard(
 def reception(
     request: Request,
     _: CurrentUser = Depends(
-        page_guard("RECEPTIONIST")
+        page_guard(*rbac.PAGE_ROLES["/ui/reception"])
     ),
 ):
 
@@ -268,7 +270,7 @@ def reception(
 def billing(
     request: Request,
     _: CurrentUser = Depends(
-        page_guard("ACCOUNTANT")
+        page_guard(*rbac.PAGE_ROLES["/ui/billing"])
     ),
 ):
 
@@ -290,10 +292,7 @@ def billing(
 def clinical(
     request: Request,
     _: CurrentUser = Depends(
-        page_guard(
-            "DOCTOR",
-            "ADMIN",
-        )
+        page_guard(*rbac.PAGE_ROLES["/ui/clinical"])
     ),
 ):
 
@@ -315,11 +314,7 @@ def clinical(
 def booking(
     request: Request,
     _: CurrentUser = Depends(
-        page_guard(
-            "PATIENT",
-            "RECEPTIONIST",
-            "ADMIN",
-        )
+        page_guard(*rbac.PAGE_ROLES["/ui/book"])
     ),
 ):
 
@@ -337,11 +332,7 @@ def booking(
 def patients(
     request: Request,
     _: CurrentUser = Depends(
-        page_guard(
-            "DOCTOR",
-            "RECEPTIONIST",
-            "ADMIN",
-        )
+        page_guard(*rbac.PAGE_ROLES["/ui/patients"])
     ),
 ):
 
@@ -359,12 +350,7 @@ def patients(
 def appointments(
     request: Request,
     _: CurrentUser = Depends(
-        page_guard(
-            "PATIENT",
-            "DOCTOR",
-            "RECEPTIONIST",
-            "ADMIN",
-        )
+        page_guard(*rbac.PAGE_ROLES["/ui/appointments"])
     ),
 ):
 
@@ -386,13 +372,7 @@ def appointments(
 def ai_chat(
     request: Request,
     _: CurrentUser = Depends(
-        page_guard(
-            "PATIENT",
-            "DOCTOR",
-            "RECEPTIONIST",
-            "ACCOUNTANT",
-            "ADMIN",
-        )
+        page_guard(*rbac.PAGE_ROLES["/ui/ai-chat"])
     ),
 ):
 
@@ -410,9 +390,7 @@ def ai_chat(
 def ai_monitor(
     request: Request,
     _: CurrentUser = Depends(
-        page_guard(
-            "ADMIN",
-        )
+        page_guard(*rbac.PAGE_ROLES["/ui/ai-monitor"])
     ),
 ):
 
@@ -434,7 +412,7 @@ def ai_monitor(
 def security(
     request: Request,
     _: CurrentUser = Depends(
-        page_guard("ADMIN")
+        page_guard(*rbac.PAGE_ROLES["/ui/security"])
     ),
 ):
 
@@ -446,13 +424,32 @@ def security(
 
 
 @router.get(
+    "/access",
+    response_class=HTMLResponse,
+)
+def access_matrix(
+    request: Request,
+    _: CurrentUser = Depends(
+        page_guard(*rbac.PAGE_ROLES["/ui/access"])
+    ),
+):
+    """Role x permission matrix - exactly what the code enforces."""
+
+    return templates.TemplateResponse(
+        request,
+        "access.html",
+        _ctx(request, "access"),
+    )
+
+
+@router.get(
     "/system",
     response_class=HTMLResponse,
 )
 def system(
     request: Request,
     _: CurrentUser = Depends(
-        page_guard("ADMIN")
+        page_guard(*rbac.PAGE_ROLES["/ui/system"])
     ),
 ):
 

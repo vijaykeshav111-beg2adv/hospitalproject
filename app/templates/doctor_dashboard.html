@@ -22,6 +22,24 @@
   </div>
 </div>
 
+<div class="card" id="reviewCard" style="margin-bottom:14px">
+  <div class="flex-between">
+    <h3 style="margin:0">Documents sent in chat &mdash; AI ne padha, aap verify karein
+      <span class="badge warn" id="revCount">…</span></h3>
+    <div class="row small">
+      <label class="row small muted" style="gap:6px">
+        <input type="checkbox" id="revMine" onchange="loadReview()"/> sirf mere patients
+      </label>
+      <button class="btn ghost sm" onclick="loadReview()">Refresh</button>
+    </div>
+  </div>
+  <div class="small muted" style="margin:6px 0 10px">
+    Patient ne chat se bheji file. AI ki reading sirf <b>madad</b> ke liye hai &ndash; ye diagnosis nahi hai.
+    Aap confirm karein, ya galat ho to sahi type chunein. Aapka faisla patient ko usi chat mein chala jaata hai.
+  </div>
+  <div id="review" class="small muted">Loading…</div>
+</div>
+
 <div class="grid g2">
   <div class="card">
     <h3>Patient lookup</h3>
@@ -67,6 +85,14 @@ async function load() {
   try {
     const d = await api('/admin/dashboard/doctor?doctor_id=' + doctorId);
     const prof = await api('/doctors/' + doctorId);
+    // Payment status of my own patients (doctor has invoices:read) so the doctor
+    // knows whose fee is still pending before the consultation.
+    let dues = {};
+    try {
+      const inv = await api('/invoices?pending_only=true&limit=200');
+      inv.filter(i => !i.doctor_id || i.doctor_id === doctorId)
+         .forEach(i => { dues[i.appointment_id] = i; });
+    } catch (e) { dues = {}; }
     document.getElementById('title').textContent = prof.full_name + ' · ' + (prof.specialty_name || '');
     const c = d.cards;
     document.getElementById('cards').innerHTML = [
@@ -80,6 +106,9 @@ async function load() {
       `<div class="kpi alt"><div class="lbl">Rating</div><div class="val">${c.rating} ★</div></div>`,
       `<div class="kpi"><div class="lbl">Fee</div><div class="val">₹${Number(prof.consultation_fee).toFixed(0)}</div>
         <div class="hint">${prof.slot_duration_minutes} min slots</div></div>`,
+      `<div class="kpi ${Object.keys(dues).length ? 'warn' : 'good'}"><div class="lbl">Pending fees</div>
+        <div class="val">${Object.keys(dues).length}</div>
+        <div class="hint">${fmt.money(Object.values(dues).reduce((t,i)=>t + Number(i.balance_amount||0),0))}</div></div>`,
     ].join('');
 
     const apptTable = rows => rows.length ? `<table><tbody>${rows.map(a => `
@@ -87,6 +116,7 @@ async function load() {
       <td><b>${fmt.esc(a.patient_name)}</b><div class="muted small">${fmt.esc(a.patient_code||'')} · ${fmt.esc(a.phone||'')}</div>
         <div class="muted small">${fmt.esc(a.reason||'')}</div></td>
       <td>${badge(a.status)} ${badge(a.queue_status)}<div class="muted small">${a.source}</div></td>
+      <td>${dueCell(dues[a.id])}</td>
       <td class="right">
         <button class="btn ghost sm" onclick="openPatient(${a.patient_id})">History</button>
         ${a.queue_status === 'CHECKED_IN' ? `<button class="btn sm dark" onclick="queue('start-consultation',${a.id})">Start</button>` : ''}
@@ -96,6 +126,7 @@ async function load() {
     document.getElementById('today').innerHTML = apptTable(d.today_schedule);
     document.getElementById('upcoming').innerHTML = apptTable(d.upcoming);
 
+    loadReview();
     const fu = await api('/consultations/follow-ups/due?days=7&doctor_id=' + doctorId);
     document.getElementById('followUps').innerHTML = fu.length ? `<table><tbody>${fu.map(f => `
       <tr><td>${f.follow_up_date}</td><td><b>${fmt.esc(f.patient_name||'')}</b>
@@ -107,6 +138,75 @@ async function load() {
       <div><b>Working days:</b> ${d.working_days.map(w => `${w.day.slice(0,3)} ${w.start}-${w.end}`).join(' · ') || '—'}</div>
       <div style="margin-top:6px"><b>Leaves:</b> ${d.leaves.map(l => `${l.type} ${l.from}→${l.to}`).join(', ') || 'none'}</div>`;
   } catch (e) { toast(e.message, 'err'); }
+}
+
+/* ---------------------------------------------------------------------------
+   Chat documents waiting for the doctor's verification (round 5)
+   --------------------------------------------------------------------------- */
+const DOC_TYPES = ['PRESCRIPTION', 'LAB_REPORT', 'SCAN', 'WOUND_PHOTO', 'DISCHARGE', 'BILL', 'REPORT', 'OTHER'];
+
+async function loadReview() {
+  const box = document.getElementById('review');
+  const mine = document.getElementById('revMine').checked;
+  try {
+    const res = await api('/ai/files/review?limit=50' + (mine ? '&mine_only=true' : ''));
+    const pending = res.pending || 0;
+    document.getElementById('revCount').textContent = pending + ' pending';
+    if (!res.files.length) {
+      box.innerHTML = '<div class="muted">Koi chat document verify karne ke liye pending nahi hai.</div>';
+      return;
+    }
+    box.innerHTML = res.files.map(f => {
+      const r = f.ai_reading || {};
+      const conf = f.confidence ? Math.round(f.confidence * 100) + '%' : '—';
+      return `
+      <div class="card" style="margin:0 0 10px;padding:10px">
+        <div class="row small" style="gap:6px;flex-wrap:wrap">
+          <span class="badge info">${fmt.esc(f.document_type || 'OTHER')}</span>
+          <span class="badge ${f.verify === 'PENDING' ? 'warn' : 'ok'}">verify: ${fmt.esc(f.verify || 'PENDING')}</span>
+          ${f.mine ? '<span class="badge ok">mera patient</span>' : ''}
+          <span class="muted">AI confidence ${conf}</span>
+          <span class="muted">· ${fmt.dt(f.uploaded_at)}</span>
+        </div>
+        <div style="margin-top:6px"><b>${fmt.esc(f.patient_name || 'Chat visitor')}</b>
+          <span class="muted small">${fmt.esc(f.patient_code || '—')} · ${fmt.esc(f.title || '')}</span></div>
+        ${r.summary ? `<div class="small" style="margin-top:4px"><b>AI ne padha:</b> ${fmt.esc(r.summary)}</div>` : ''}
+        ${r.medicines && r.medicines.length ? `<div class="small"><b>Medicines:</b> ${fmt.esc(r.medicines.join(', '))}</div>` : ''}
+        ${r.visible_text ? `<details class="small"><summary class="muted">padha hua text</summary>${fmt.esc(String(r.visible_text).slice(0, 1200))}</details>` : ''}
+        <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:6px">
+          <a class="btn ghost sm" href="${f.view_url}?token=${encodeURIComponent(Auth.token())}" target="_blank" rel="noopener">File dekhein</a>
+          <select id="dt${f.file_id}" style="max-width:190px">${DOC_TYPES.map(t =>
+            `<option value="${t}" ${t === (f.document_type || 'OTHER') ? 'selected' : ''}>${t}</option>`).join('')}</select>
+          <input id="note${f.file_id}" placeholder="note (optional)" style="max-width:220px"/>
+          <button class="btn sm" onclick="verifyFile(${f.file_id}, 'CONFIRMED')">✔ Confirm</button>
+          <button class="btn sm dark" onclick="verifyFile(${f.file_id}, 'CORRECTED')">✎ Correct karein</button>
+          <button class="btn sm ghost" onclick="verifyFile(${f.file_id}, 'NEEDS_REVIEW')">? Aur jaanch</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    box.innerHTML = '<span class="badge bad">' + fmt.esc(e.message) + '</span>';
+  }
+}
+
+async function verifyFile(fileId, decision) {
+  const fd = new FormData();
+  fd.append('decision', decision);
+  const note = document.getElementById('note' + fileId).value.trim();
+  if (note) fd.append('note', note);
+  if (decision === 'CORRECTED') fd.append('document_type', document.getElementById('dt' + fileId).value);
+  try {
+    const res = await api('/ai/files/' + fileId + '/verify', {method: 'POST', form: fd});
+    toast(decision.replace('_', ' ').toLowerCase() + ' · ' + res.document_type, 'ok');
+    loadReview();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+function dueCell(inv) {
+  if (!inv) return '<span class="badge ok">paid</span>';
+  return '<span class="badge warn">due ' + fmt.money(inv.balance_amount) + '</span>' +
+         '<div class="muted small"><a href="/api/v1/invoices/' + inv.id + '/receipt" target="_blank">' +
+         inv.invoice_number + '</a></div>';
 }
 
 async function queue(action, id) {

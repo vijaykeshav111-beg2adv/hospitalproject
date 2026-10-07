@@ -452,12 +452,31 @@ def main() -> int:
 
     # ------------------------------------------------------------------
     section("9. without a key the fallback stays off (AI_MODE=local)")
-    check("groq_engine.is_available() is False with no GROQ_API_KEY", groq_engine.is_available() is False)
-    db.rollback()
-    offline = ask("tavda lg gya", "hf-offline")
-    check("no key -> clarification, not a crash",
-          offline["specialty"] is None and "ask rather than guess" in offline["reply"])
 
+    original_groq_key = settings.groq_api_key
+    original_mode = type(settings).ai_mode
+
+    try:
+        settings.groq_api_key = ""
+        type(settings).ai_mode = property(lambda self: "local")
+
+        check(
+            "groq_engine.is_available() is False with no GROQ_API_KEY",
+            groq_engine.is_available() is False,
+        )
+
+        db.rollback()
+
+        offline = ask("tavda lg gya", "hf-offline")
+
+        check(
+            "no key -> clarification, not a crash",
+            offline["specialty"] is None
+            and "ask rather than guess" in offline["reply"],
+        )
+    finally:
+        settings.groq_api_key = original_groq_key
+        type(settings).ai_mode = original_mode
     db.close()
 
     print("\n" + "=" * 78)

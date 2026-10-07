@@ -214,20 +214,26 @@ function guard(...roles) {
   return true;
 }
 
+/*
+ * Navigation must mirror the page guards in app/web.py - a link that only
+ * bounces the user back is worse than no link. "roles" lists exactly the roles
+ * that can open the page (SUPER_ADMIN is always allowed by page_guard()).
+ */
 const NAV = [
-  {href:'/ui/super-admin',   label:'Super Admin', perms:['admin:*']},
-  {href:'/ui/admin',        label:'Admin',      perms:['dashboard:admin']},
-  {href:'/ui/reception',    label:'Reception',  perms:['dashboard:reception']},
-  {href:'/ui/doctor',       label:'Doctor',     perms:['dashboard:doctor']},
-  {href:'/ui/patient',      label:'My health',  perms:['dashboard:patient']},
-  {href:'/ui/appointments', label:'Appointments'},
-  {href:'/ui/patients',     label:'Patients',   perms:['patients:read']},
-  {href:'/ui/clinical',     label:'Clinical',   perms:['records:read','consultations:read']},
-  {href:'/ui/billing',      label:'Billing',    perms:['invoices:read']},
+  {href:'/ui/super-admin',   label:'Super Admin', roles:['SUPER_ADMIN']},
+  {href:'/ui/admin',        label:'Admin',      roles:['ADMIN']},
+  {href:'/ui/reception',    label:'Reception',  roles:['RECEPTIONIST']},
+  {href:'/ui/doctor',       label:'Doctor',     roles:['DOCTOR']},
+  {href:'/ui/patient',      label:'My health',  roles:['PATIENT']},
+  {href:'/ui/appointments', label:'Appointments', roles:['PATIENT','DOCTOR','RECEPTIONIST','ADMIN']},
+  {href:'/ui/patients',     label:'Patients',   roles:['DOCTOR','RECEPTIONIST','ADMIN']},
+  {href:'/ui/clinical',     label:'Clinical',   roles:['DOCTOR','ADMIN']},
+  {href:'/ui/billing',      label:'Billing',    roles:['ACCOUNTANT']},
   {href:'/ui/ai-chat',      label:'AI assistant'},
-  {href:'/ui/ai-monitor',   label:'AI monitor', perms:['ai:admin']},
-  {href:'/ui/security',     label:'Security',   perms:['audit:read','session:manage']},
-  {href:'/ui/system',       label:'System',     perms:['settings:manage']},
+  {href:'/ui/ai-monitor',   label:'AI monitor', roles:['ADMIN']},
+  {href:'/ui/security',     label:'Security',   roles:['ADMIN']},
+  {href:'/ui/access',       label:'Access',     roles:['ADMIN']},
+  {href:'/ui/system',       label:'System',     roles:['ADMIN']},
 ];
 
 async function mountChrome() {
@@ -235,6 +241,8 @@ async function mountChrome() {
   const me = Auth.user();
   NAV.forEach(item => {
     if (item.perms && !item.perms.some(p => Auth.has(p))) return;
+    // explicit role list (mirrors the page guard) - SUPER_ADMIN sees everything
+    if (item.roles && !item.roles.includes(Auth.role()) && Auth.role() !== 'SUPER_ADMIN') return;
     const a = document.createElement('a');
     a.href = item.href; a.textContent = item.label;
     if (location.pathname === item.href) a.className = 'on';

@@ -292,29 +292,69 @@ def _email_for(db: Session, notif: models.Notification) -> str:
 
 
 def _send_email(to: str, subject: str, body: str) -> tuple[bool, str | None, str | None]:
-    if not settings.email_enabled or not to:
-        log.info("[Email:console] to=%s subject=%s\n%s", to, subject, body)
-        return True, "console", None
-    try:  # pragma: no cover
-        msg = MIMEText(body)
-        msg["Subject"] = subject
-        msg["From"] = settings.email_from
-        msg["To"] = to
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15) as server:
-            server.starttls()
-            if settings.smtp_user:
-                server.login(settings.smtp_user, settings.smtp_password)
-            server.sendmail(settings.email_from, [to], msg.as_string())
-        return True, "smtp", None
+    """Send one plain-text email. Returns (ok, reference, error).
+
+    Port 465 speaks TLS from the first byte, 587/25/others start plain and (if
+    the server offers it) get upgraded with STARTTLS. Servers without STARTTLS
+    still work - earlier builds called starttls() unconditionally, which broke
+    exactly those servers. A disabled channel is reported as a failure with the
+    reason, never as a fake success.
+    """
+    if not to:
+        return False, None, "no email address on file for this patient/user"
+    if not settings.email_enabled:
+        return False, None, "EMAIL_ENABLED=false in .env - email notifications are switched off"
+
+    msg = MIMEText(body, "plain", "utf-8")
+    msg["Subject"] = subject
+    msg["From"] = settings.email_from
+    msg["To"] = to
+    port = int(settings.smtp_port or 587)
+    try:
+        if port == 465:
+            with smtplib.SMTP_SSL(settings.smtp_host, port, timeout=15) as server:
+                if settings.smtp_user:
+                    server.login(settings.smtp_user, settings.smtp_password)
+                server.sendmail(settings.email_from, [to], msg.as_string())
+        else:
+            with smtplib.SMTP(settings.smtp_host, port, timeout=15) as server:
+                try:
+                    server.starttls()
+                except smtplib.SMTPException:
+                    pass                      # server does not offer STARTTLS - keep going
+                if settings.smtp_user:
+                    server.login(settings.smtp_user, settings.smtp_password)
+                server.sendmail(settings.email_from, [to], msg.as_string())
+        return True, f"smtp:{settings.smtp_host}:{port}", None
     except Exception as exc:  # noqa: BLE001
         return False, None, str(exc)[:255]
+
+
+def available_channels(requested: list[str] | None = None) -> list[str]:
+    """The channels this installation can actually deliver on.
+
+    Every caller asks for ``["WHATSAPP", "IN_APP"]``. That is right for a
+    hospital with Twilio, but in the common case (WhatsApp/Twilio not set up,
+    SMTP configured instead) the patient then only gets an in-app row and the
+    message never leaves the building.
+
+    So: when ``EMAIL_ENABLED=true``, email is added to every patient
+    notification automatically. When it is off, the requested channels are
+    returned exactly as before - development behaviour is unchanged.
+    """
+    out = list(requested or ["WHATSAPP", "IN_APP"])
+    if "IN_APP" not in out:
+        out.append("IN_APP")
+    if settings.email_enabled and "EMAIL" not in out:
+        out.insert(0, "EMAIL")          # email first: it is the reliable one here
+    return out
 
 
 def notify_patient(db: Session, patient: models.Patient, template: str, context: dict[str, str],
                    channels: list[str] | None = None, appointment_id: int | None = None,
                    scheduled_at=None) -> list[models.Notification]:
     """Fan-out helper: queue + dispatch on every requested channel."""
-    channels = channels or ["WHATSAPP", "IN_APP"]
+    channels = available_channels(channels)
     out = []
     for channel in channels:
         notif = queue_notification(

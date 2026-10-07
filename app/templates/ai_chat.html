@@ -13,6 +13,21 @@
 <div class="grid g2" style="margin-top:14px">
   <div class="card">
     <div id="chat" class="chat" style="height:56vh"></div>
+
+    <!-- upload: prescription / report / X-ray / wound photo -->
+    <div class="card" id="uploadBar" style="margin:10px 0 0;padding:10px">
+      <div class="row">
+        <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.pdf"
+               style="display:none" onchange="onFilePicked(event)"/>
+        <button class="btn ghost sm" id="pickBtn" onclick="pickFile()">📎 Parchi / report / X-ray bhejein</button>
+        <input id="fileNote" class="sm" placeholder="file ke baare mein chhota note (optional)"/>
+      </div>
+      <div class="small muted" style="margin-top:6px">
+        Photo ya PDF (prescription, lab report, X-ray/scan, khaav/daane ki photo). AI sirf <b>padhkar batata hai</b> -
+        confirm karne ke liye doctor verify karta hai. Ye diagnosis nahi hai. Emergency mein seedha 108 par call karein.
+      </div>
+    </div>
+
     <div class="row" style="margin-top:10px">
       <input id="msg" placeholder="Describe your concern, ask for reports, ask to cancel…"
              onkeydown="if(event.key==='Enter')send()"/>
@@ -26,6 +41,11 @@
   </div>
 
   <div>
+    <div class="card">
+      <h3>Files in this chat</h3>
+      <div id="files" class="small muted">Koi file nahi aayi abhi.</div>
+      <div class="small muted" style="margin-top:8px" id="aiReadFlag"></div>
+    </div>
     <div class="card">
       <h3>Live assistant trace</h3>
       <div id="trace" class="small muted">No activity yet.</div>
@@ -42,9 +62,9 @@
         <button class="chip" onclick="send('show my last prescription')">my prescription</button>
         <button class="chip" onclick="send('what is my payment status?')">payment status</button>
         <button class="chip" onclick="send('I want to cancel my appointment')">cancel appointment</button>
+        <button class="chip" onclick="send('talk to a doctor')">doctor se consult</button>
         <button class="chip" onclick="send('should I take paracetamol for this fever?')">medical advice test</button>
         <button class="chip" onclick="send('I have severe chest pain and cannot breathe')">emergency test</button>
-        <button class="chip" onclick="send('talk to reception')">human escalation</button>
       </div>
     </div>
   </div>
@@ -53,7 +73,7 @@
 
 {% block scripts %}
 <script>
-let conv = null, session = null, picks = [];
+let conv = null, session = null, picks = [], files = [], lastFileId = null;
 const box = document.getElementById('chat');
 
 function bubble(role, text) {
@@ -61,9 +81,13 @@ function bubble(role, text) {
   d.className = 'msg ' + role; d.textContent = text;
   box.appendChild(d); box.scrollTop = box.scrollHeight; return d;
 }
+function node(html) { const d = document.createElement('div'); d.className = 'msg bot'; d.innerHTML = html;
+  box.appendChild(d); box.scrollTop = box.scrollHeight; return d; }
+
 bubble('bot', 'Namaste! I am the AI front desk of Vijay Vargiya Group of Hospitals.\n' +
   'Tell me your concern in your own words and I will find the right specialist, show live slots and book ' +
-  'your appointment. I can also look up reports, prescriptions and bills.');
+  'your appointment. I can also look up reports, prescriptions and bills.\n' +
+  'Aap purani parchi, report, X-ray ya khaav ki photo bhi bhej sakte hain - 📎 button se.');
 
 function log(msg, kind='') {
   const t = document.getElementById('trace');
@@ -71,10 +95,160 @@ function log(msg, kind='') {
   t.innerHTML += `<div>${kind ? `<span class="badge ${kind}">${kind}</span> ` : ''}${fmt.esc(msg)}</div>`;
 }
 
+function setChips(list) {
+  const chips = document.getElementById('chips'); chips.innerHTML = '';
+  (list || []).forEach(c => {
+    const b = document.createElement('button'); b.className = 'chip'; b.textContent = c;
+    b.onclick = () => send(c); chips.appendChild(b);
+  });
+}
+
+/* ------------------------------------------------------------------ upload */
+function pickFile() { document.getElementById('fileInput').click(); }
+
+async function onFilePicked(ev) {
+  const f = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if (f) await uploadFile(f);
+}
+
+async function uploadFile(file) {
+  const mb = file.size / (1024 * 1024);
+  if (mb > 25) { bubble('sys', 'File ' + mb.toFixed(1) + ' MB hai - limit 25 MB hai.'); return; }
+  bubble('user', '📎 ' + file.name + '  (' + Math.round(file.size / 1024) + ' KB)');
+  const t = bubble('sys', 'file bhej raha hoon… AI padh raha hai…');
+  const btn = document.getElementById('pickBtn'); btn.disabled = true;
+  const fd = new FormData();
+  fd.append('file', file);
+  if (conv) fd.append('conversation_id', conv);
+  if (session) fd.append('session_id', session);
+  const note = (document.getElementById('fileNote').value || '').trim();
+  if (note) fd.append('note', note);
+  document.getElementById('fileNote').value = '';
+  try {
+    const res = await api('/ai/files', {method: 'POST', form: fd});
+    conv = res.conversation_id; session = res.session_id;
+    t.remove();
+    bubble('bot', res.reply);
+    lastFileId = res.file_id || lastFileId;
+    renderReading(res);
+    if (res.file_id) consultChip(res.file_id);
+    setChips(res.quick_replies || []);
+    log('FILE_UPLOAD · ' + (res.document_type || 'OTHER') +
+        (res.understanding && res.understanding.read_by_ai ? ' · AI ne padha' : ' · AI reading off') +
+        (res.understanding && res.understanding.suggested_specialty ? ' → ' + res.understanding.suggested_specialty : ''),
+        'info');
+    document.getElementById('state').textContent = JSON.stringify({
+      conversation_id: conv, session_id: session, document_type: res.document_type,
+      category: res.category, size_bytes: res.size_bytes, linked_to_patient: res.patient_linked,
+      ai_reading: res.ai_reading, understanding: res.understanding
+    }, null, 2);
+    loadFiles();
+  } catch (e) {
+    t.remove(); bubble('sys', 'error: ' + e.message);
+  } finally { btn.disabled = false; }
+}
+
+function renderReading(res) {
+  const r = res.ai_reading;
+  const type = res.document_type || 'OTHER';
+  const rows = [];
+  if (r) {
+    if (r.summary) rows.push(['AI ne kya padha', r.summary]);
+    if (r.medicines && r.medicines.length) rows.push(['Medicines likhi hain', r.medicines.join(', ')]);
+    if (r.doctor_name) rows.push(['Doctor ka naam', r.doctor_name]);
+    if (r.document_date) rows.push(['Document ki date', r.document_date]);
+    if (r.body_area) rows.push(['Body area', r.body_area]);
+    if (typeof r.confidence === 'number') rows.push(['AI confidence', (r.confidence * 100).toFixed(0) + '%']);
+    if (r.visible_text) rows.push(['Padha hua text', String(r.visible_text).slice(0, 400)]);
+  }
+  const html = [];
+  html.push(`<div class="card" style="margin:0 0 6px;padding:10px">
+    <div class="row small" style="gap:6px">
+      <span class="badge info">${fmt.esc(type)}</span>
+      <span class="badge warn">doctor verification: PENDING</span>
+      ${res.patient_linked ? '<span class="badge ok">patient record</span>' :
+        '<span class="badge mute">chat ke saath (naam+mobile dene par record mein judega)</span>'}
+    </div>`);
+  if (rows.length) {
+    html.push('<table class="small" style="width:100%;margin-top:8px">');
+    rows.forEach(([k, v]) => html.push(
+      `<tr><td class="muted" style="width:38%;vertical-align:top">${fmt.esc(k)}</td>` +
+      `<td>${fmt.esc(v)}</td></tr>`));
+    html.push('</table>');
+  } else {
+    html.push('<div class="small muted" style="margin-top:8px">AI reading abhi available nahi hai - doctor file khud dekhega.</div>');
+  }
+  html.push(`<div class="small muted" style="margin-top:8px">
+      ⚠️ Ye AI ki reading hai, diagnosis nahi. Doctor verify karega.
+      ${res.view_url ? `<a href="${res.view_url}" target="_blank" rel="noopener">file dekhein</a>` : ''}
+    </div></div>`);
+  node(html.join(''));
+}
+
+function consultChip(fileId) {
+  const wrap = document.createElement('div'); wrap.className = 'chips';
+  const b = document.createElement('button'); b.className = 'chip';
+  b.textContent = '👨‍⚕️ Doctor se consult karein';
+  b.onclick = () => consultDoctor(fileId); wrap.appendChild(b);
+  box.appendChild(wrap); box.scrollTop = box.scrollHeight;
+}
+
+async function consultDoctor(fileId) {
+  fileId = fileId || lastFileId;
+  if (!fileId) { bubble('sys', 'Pehle koi file bhejein, phir doctor se consult kar sakte hain.'); return; }
+  bubble('user', '👨‍⚕️ Doctor se consult karna hai');
+  const t = bubble('sys', 'doctor ko bhej raha hoon…');
+  const fd = new FormData();
+  if (conv) fd.append('conversation_id', conv);
+  if (session) fd.append('session_id', session);
+  fd.append('reason', 'patient ne chat se document bhejkar doctor se baat maangi');
+  try {
+    const res = await api(`/ai/files/${fileId}/consult`, {method: 'POST', form: fd});
+    t.remove();
+    bubble('bot', res.reply);
+    setChips(res.quick_replies || []);
+    log('escalated to DOCTOR (document review) · escalation #' + res.escalation.escalation_id, 'bad');
+    log('doctor ko in-app notify kiya: ' + res.escalation.notified_doctors, 'info');
+  } catch (e) { t.remove(); bubble('sys', 'error: ' + e.message); }
+}
+
+/* --------------------------------------------------------- files side panel */
+async function loadFiles() {
+  if (!conv) return;
+  try {
+    const res = await api('/ai/files/conversation/' + conv);
+    files = res.files || [];
+    document.getElementById('aiReadFlag').textContent = res.ai_reading_enabled
+      ? 'AI document reading: ON' : 'AI document reading: OFF (GROQ_API_KEY set karein) - doctor khud padhega.';
+    const box2 = document.getElementById('files');
+    if (!files.length) { box2.className = 'small muted'; box2.textContent = 'Koi file nahi aayi abhi.'; return; }
+    box2.className = '';
+    box2.innerHTML = files.map((f, i) => `
+      <div class="row small" style="justify-content:space-between;align-items:center;border-bottom:1px dashed var(--line,#333);padding:5px 0">
+        <div>
+          <span class="badge mute">${fmt.esc(f.document_type || 'OTHER')}</span>
+          ${fmt.esc(f.name || '')}<br/>
+          <span class="muted">${fmt.esc(String(Math.max(1, Math.round((f.size_bytes || 0) / 1024))))} KB ·
+            ${f.patient_linked ? 'patient record' : 'naam/mobile pending'}</span>
+        </div>
+        <div class="row" style="gap:6px">
+          ${f.view_url ? `<a class="btn ghost sm" href="${f.view_url}" target="_blank" rel="noopener">dekhein</a>` : ''}
+          ${f.file_id ? `<button class="btn ghost sm" onclick="consultDoctor(${f.file_id})">consult</button>` : ''}
+        </div>
+      </div>`).join('');
+  } catch (e) { /* the panel is a nicety - never block the chat */ }
+}
+
+/* ------------------------------------------------------------------- chat */
 async function send(preset) {
   const input = document.getElementById('msg');
   const text = preset || input.value.trim();
   if (!text) return;
+  // "doctor se consult" is a file action, not a chat message
+  if (/doctor se (consult|baat)|consult.{0,10}doctor|tal?k to (a )?doctor/i.test(text) && lastFileId) {
+    input.value = ''; return consultDoctor(lastFileId);
+  }
   input.value = '';
   bubble('user', text);
   const t = bubble('sys', 'thinking…');
@@ -101,11 +275,7 @@ async function send(preset) {
       escalation: res.escalation, safety: res.safety, tools_used: res.tools_used
     }, null, 2);
 
-    const chips = document.getElementById('chips'); chips.innerHTML = '';
-    (res.quick_replies || []).forEach(c => {
-      const b = document.createElement('button'); b.className = 'chip'; b.textContent = c;
-      b.onclick = () => send(c); chips.appendChild(b);
-    });
+    setChips(res.quick_replies || []);
     if ((res.slots || []).length) {
       picks = res.slots;
       const wrap = document.createElement('div'); wrap.className = 'chips';
@@ -116,6 +286,7 @@ async function send(preset) {
       });
       box.appendChild(wrap); box.scrollTop = box.scrollHeight;
     }
+    loadFiles();
   } catch (e) {
     t.remove(); bubble('sys', 'error: ' + e.message);
   } finally { btn.disabled = false; }
@@ -130,15 +301,21 @@ async function sendSlot(slot) {
     conv = res.conversation_id; t.remove();
     bubble('bot', res.reply);
     document.getElementById('stageBadge').textContent = 'stage: ' + res.stage;
-    const chips = document.getElementById('chips'); chips.innerHTML = '';
-    (res.quick_replies || []).forEach(c => {
-      const b = document.createElement('button'); b.className = 'chip'; b.textContent = c;
-      b.onclick = () => send(c); chips.appendChild(b);
-    });
+    setChips(res.quick_replies || []);
   } catch (e) { t.remove(); bubble('sys', 'error: ' + e.message); }
 }
 
-function resetChat() { conv = null; session = null; box.innerHTML = ''; document.getElementById('trace').textContent =
-  'No activity yet.'; bubble('bot', 'New conversation started. How can I help?'); }
+/* drag & drop / paste straight into the chat box */
+['dragover','drop'].forEach(ev => box.addEventListener(ev, e => e.preventDefault()));
+box.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) uploadFile(f); });
+document.getElementById('msg').addEventListener('paste', e => {
+  const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/'));
+  if (item) { const f = item.getAsFile(); if (f) { e.preventDefault(); uploadFile(f); } }
+});
+
+function resetChat() { conv = null; session = null; files = []; lastFileId = null; box.innerHTML = '';
+  document.getElementById('trace').textContent = 'No activity yet.';
+  document.getElementById('files').textContent = 'Koi file nahi aayi abhi.';
+  bubble('bot', 'New conversation started. How can I help?'); }
 </script>
 {% endblock %}

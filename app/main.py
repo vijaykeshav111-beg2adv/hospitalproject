@@ -12,9 +12,10 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .database import db_health, init_db
-from .routers import (admin, ai, analytics, appointments, auth, consultations, doctors, invoices,
-                      leaves, medical_files, medical_records, medicines, notifications, patients,
-                      payments, prescriptions, queue, reviews, schedules, specialties, users)
+from .routers import (admin, ai, ai_files, analytics, appointments, auth, consultations, doctors,
+                      invoices, leaves, medical_files, medical_records, medicines, notifications,
+                      patients, payments, prescriptions, queue, reviews, schedules, specialties,
+                      users)
 from .services import jobs
 from .web import UILoginRequired, home_for_role
 from .web import router as web_router
@@ -99,7 +100,8 @@ def create_app() -> FastAPI:
         schedules.router, schedules.slot_router, leaves.router, appointments.router, queue.router,
         consultations.router, medical_records.router, medical_files.router, medicines.router,
         prescriptions.router, invoices.router, payments.router, reviews.router,
-        notifications.router, notifications.wa_router, ai.router, analytics.router,
+        notifications.router, notifications.wa_router, ai.router, ai_files.router,
+        analytics.router,
         analytics.admin_router, admin.router,
     ]
     for r in api_routers:

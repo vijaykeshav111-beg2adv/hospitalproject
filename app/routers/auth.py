@@ -783,6 +783,52 @@ def login_activity(db: Session = Depends(get_db), email: str | None = None, stat
 
 
 
+@router.get("/roles/matrix", summary="Role x permission matrix (what the code enforces)")
+def roles_matrix(db: Session = Depends(get_db),
+                 _: CurrentUser = Depends(require_permission("audit:read", "users:read", any_of=True))):
+    """One source of truth for 'kis role ko kitna access hai'.
+
+    Permissions come from ``app/rbac.py`` (the same table the API guards use),
+    the pages come from ``rbac.PAGE_ROLES`` - which ``app/web.py`` also uses for
+    its guards, so the screen can never drift from the enforcement.
+    """
+    from .. import rbac
+
+    roles = ["SUPER_ADMIN", "ADMIN", "DOCTOR", "RECEPTIONIST", "ACCOUNTANT", "PATIENT"]
+    granted_by_role = {role: set(rbac.permissions_for_role(role)) for role in roles}
+
+    permissions = []
+    for name, (group, description) in rbac.PERMISSIONS.items():
+        permissions.append({
+            "name": name,
+            "group": group,
+            "description": description,
+            "roles": [role for role in roles if name in granted_by_role[role]],
+        })
+
+    pages = [
+        {"path": path, "label": rbac.PAGE_LABELS.get(path, ""), "roles": list(page_roles)}
+        for path, page_roles in rbac.PAGE_ROLES.items()
+    ]
+    return {
+        "roles": roles,
+        "permissions": permissions,
+        "pages": pages,
+        "role_permission_counts": {role: len(granted_by_role[role]) for role in roles},
+    }
+
+
+@router.get("/roles", summary="Roles and their permissions")
+def list_roles(db: Session = Depends(get_db),
+               _: CurrentUser = Depends(require_permission("users:read", "audit:read", any_of=True))):
+    rows = db.scalars(select(models.Role).order_by(models.Role.id)).all()
+    return [
+        {"id": role.id, "name": role.name, "description": role.description,
+         "permissions": sorted(permissions_for_role(role.name))}
+        for role in rows
+    ]
+
+
 @router.get("/audit-logs", response_model=list[schemas.AuditLogOut], summary="Audit trail")
 
 def audit_logs(db: Session = Depends(get_db), action: str | None = None, resource: str | None = None,

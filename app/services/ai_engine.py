@@ -785,6 +785,14 @@ def _link_patient(db: Session, conv: models.AIConversation, patient: models.Pati
     conv.patient_id = patient.id
     conv.patient_type = ptype
     db.commit()
+    # a patient who uploaded documents before telling us who they are must not
+    # lose them: attach every pending chat upload to the patient record now
+    try:
+        from . import chat_documents          # local import: avoids a service cycle
+        chat_documents.link_pending(db, conv, patient)
+    except Exception:                          # never break a chat reply because of this
+        log.exception("Could not link pending chat uploads to %s", getattr(patient, "patient_code", "?"))
+    return None
 
 
 def create_patient_from_chat(db: Session, name: str, phone: str, age: int | None = None,

@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Role access matrix{% endblock %}
+{% block content %}
+<div class="flex-between">
+  <h2 style="margin:0">Role access matrix</h2>
+  <div class="row">
+    <button class="btn ghost sm" onclick="load()">Refresh</button>
+    <a class="btn ghost sm" href="/ui/security">Security logs</a>
+  </div>
+</div>
+<p class="muted small" style="max-width:900px">
+  Ye page seedha <code>app/rbac.py</code> (permissions) aur <code>app/web.py</code> (page guards)
+  se banta hai - jo yahan likha hai wahi API aur browser dono par lagta hai. Ek role ke paas
+  permission hai to API khulega; page kholne ke liye us role ki portal entry bhi chahiye.
+  <b>SUPER_ADMIN</b> har page khol sakta hai (super-admin bypass).
+</p>
+
+<div class="card" style="margin-top:12px">
+  <h3>Portals - har role ka apna dashboard</h3>
+  <table>
+    <thead><tr><th>Role</th><th>Dashboard</th><th>Email (demo)</th></tr></thead>
+    <tbody id="portalRows"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="flex-between">
+    <h3 style="margin:0">Permission matrix</h3>
+    <div class="row">
+      <input id="q" placeholder="filter: payments, ai, patients…" style="max-width:240px" oninput="render()"/>
+      <label class="small muted"><input type="checkbox" id="onlyDiff" onchange="render()"/> sirf jahan roles alag hain</label>
+    </div>
+  </div>
+  <div style="overflow:auto">
+    <table id="matrixTable">
+      <thead id="matrixHead"></thead>
+      <tbody id="matrixBody"><tr><td class="muted">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <p class="muted small" style="margin-top:8px">
+    <span class="badge ok">✓</span> = is role ke paas permission hai &nbsp;·&nbsp;
+    <span class="badge mute">·</span> = nahi hai &nbsp;·&nbsp;
+    API ke andar <code>require_permission("payments:write")</code> isi table se check karta hai.
+  </p>
+</div>
+
+<div class="card">
+  <h3>Pages - kaun kaun sa page khol sakta hai</h3>
+  <div style="overflow:auto">
+    <table><thead><tr><th>Page</th><th>Roles</th></tr></thead>
+      <tbody id="pageRows"><tr><td colspan="2" class="muted">Loading…</td></tr></tbody></table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ROLES = ['SUPER_ADMIN','ADMIN','DOCTOR','RECEPTIONIST','ACCOUNTANT','PATIENT'];
+const PORTALS = {
+  SUPER_ADMIN:  {url:'/ui/super-admin', email:'superadmin@vijayvargiiyahospital.in'},
+  ADMIN:        {url:'/ui/admin',       email:'admin@vijayvargiiyahospital.in'},
+  DOCTOR:       {url:'/ui/doctor',      email:'dr.arjunmehra@vijayvargiiyahospital.in'},
+  RECEPTIONIST: {url:'/ui/reception',   email:'reception@vijayvargiiyahospital.in'},
+  ACCOUNTANT:   {url:'/ui/billing',     email:'accounts@vijayvargiiyahospital.in'},
+  PATIENT:      {url:'/ui/patient',     email:'ramesh.yadav@example.com'},
+};
+let DATA = null;
+
+if (guard(['ADMIN'])) load();
+
+async function load() {
+  try {
+    DATA = await api('/auth/roles/matrix');
+    document.getElementById('portalRows').innerHTML = ROLES.map(r => {
+      const p = PORTALS[r] || {};
+      return `<tr>
+        <td><span class="badge info">${r}</span></td>
+        <td><a href="${p.url}">${p.url}</a></td>
+        <td class="small muted">${p.email || ''}</td>
+      </tr>`;
+    }).join('');
+    renderPortals(DATA);
+    render();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+function renderPortals(d) {
+  document.getElementById('pageRows').innerHTML = d.pages.map(p => `
+    <tr>
+      <td><b>${p.path}</b><div class="muted small">${fmt.esc(p.label)}</div></td>
+      <td>${p.roles.map(r => `<span class="badge ${r === 'SUPER_ADMIN' ? 'info' : 'mute'}">${r}</span>`).join(' ')}</td>
+    </tr>`).join('');
+}
+
+function render() {
+  if (!DATA) return;
+  const q = (document.getElementById('q').value || '').toLowerCase();
+  const onlyDiff = document.getElementById('onlyDiff').checked;
+  const rows = DATA.permissions.filter(p =>
+    (!q || p.name.toLowerCase().includes(q) || p.group.includes(q) || p.description.toLowerCase().includes(q))
+    && (!onlyDiff || new Set(ROLES.map(r => p.roles.includes(r))).size > 1));
+
+  document.getElementById('matrixHead').innerHTML =
+    `<tr><th style="min-width:230px">Permission</th>` +
+    ROLES.map(r => `<th style="text-align:center">${r}</th>`).join('') + `</tr>`;
+
+  let group = null, html = '';
+  rows.forEach(p => {
+    if (p.group !== group) {
+      group = p.group;
+      html += `<tr><td colspan="${ROLES.length + 1}" style="background:rgba(0,0,0,.03)"><b>${group}</b></td></tr>`;
+    }
+    html += `<tr><td><code>${p.name}</code><div class="muted small">${fmt.esc(p.description)}</div></td>` +
+      ROLES.map(r => `<td style="text-align:center">${p.roles.includes(r)
+        ? '<span class="badge ok">✓</span>' : '<span class="badge mute">·</span>'}</td>`).join('') + `</tr>`;
+  });
+  document.getElementById('matrixBody').innerHTML = html || '<tr><td class="muted">No match.</td></tr>';
+}
+</script>
+{% endblock %}

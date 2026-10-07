@@ -305,6 +305,39 @@ def main() -> int:
             r = client.post(f"/api/v1/admin/jobs/{job}/run", headers=hdr(admin))
             check(f"job: {job}", r.status_code == 200 and r.json()["status"] == "SUCCESS", r.text[:120])
 
+        # ---------- notification channels + email ----------
+        # The whole system asks for ["WHATSAPP", "IN_APP"]. When SMTP is
+        # configured, email must be added automatically; when nothing is
+        # configured, a disabled channel must report the truth (never a fake
+        # "sent").
+        from app.config import settings as live_settings
+        from app.services import notify as notify_service
+
+        was_email, was_wa = live_settings.email_enabled, live_settings.whatsapp_enabled
+        try:
+            live_settings.email_enabled, live_settings.whatsapp_enabled = False, False
+            check("channels unchanged when nothing is configured",
+                  notify_service.available_channels(["WHATSAPP", "IN_APP"]) == ["WHATSAPP", "IN_APP"],
+                  str(notify_service.available_channels(["WHATSAPP", "IN_APP"])))
+            live_settings.email_enabled = True
+            chans = notify_service.available_channels(["WHATSAPP", "IN_APP"])
+            check("email is added automatically when SMTP is switched on",
+                  chans[0] == "EMAIL" and "IN_APP" in chans and "WHATSAPP" in chans, str(chans))
+            live_settings.email_enabled = False
+            ok, _ref, err = notify_service._send_email("someone@example.com", "test", "body")
+            check("email stays off while EMAIL_ENABLED=false", ok is False and "EMAIL_ENABLED" in (err or ""),
+                  f"ok={ok} err={err}")
+            ok, _ref, err = notify_service._send_email("someone@example.com", "test", "body")
+            check("no recipient -> clear error, no crash", ok is False and bool(err), str(err))
+            stats = client.get("/api/v1/notifications/stats?days=30", headers=hdr(admin)).json()
+            check("notification stats expose the live channels",
+                  "available_channels" in stats and "email_enabled" in stats, str(list(stats))[:120])
+            test_mail = client.post("/api/v1/notifications/test-email", headers=hdr(admin))
+            check("POST /notifications/test-email explains the state",
+                  test_mail.status_code == 200 and "detail" in test_mail.json(), test_mail.text[:120])
+        finally:
+            live_settings.email_enabled, live_settings.whatsapp_enabled = was_email, was_wa
+
         # ---------- logout ----------
         check("logout", client.post("/api/v1/auth/logout", headers=hdr(reception)).status_code == 200)
 

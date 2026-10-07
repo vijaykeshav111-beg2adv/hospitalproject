@@ -1,4 +1,3 @@
-
 """Controlled hospital tool layer exposed to the Groq assistant. The registry exposes 18 tools.
 
 Every tool is a plain function:  fn(db, ctx, **kwargs) -> dict
@@ -690,43 +689,6 @@ TOOLS: dict[str, dict] = {
     "get_payment_status": {"fn": get_payment_status, "category": "billing", "description": "Get an authenticated patient's payment status and outstanding amount.", "parameters": {"patient_id": "int|null", "invoice_id": "int|null"}},
     "send_notification": {"fn": send_notification, "category": "notification", "description": "Send an allowed hospital notification to the authenticated patient.", "parameters": {"template": "string", "message": "string|null", "channel": "string", "patient_id": "int|null"}},
 }
-
-
-
-# --------------------------------------------------------------------------
-# TOKEN-EFFICIENT PAYLOAD COMPACTION (for the LLM tool loop)
-# --------------------------------------------------------------------------
-def compact_for_llm(payload: dict, limit: int = 900) -> dict:
-    """Shrink a tool result before sending it back to the LLM.
-
-    Keeps ids, names, labels, dates, times, fees and status; drops URLs and
-    long free-text fields. This is the single biggest token saver in the
-    tool-calling loop - a raw slot/doctor list can be 3-4x bigger than what
-    the model actually needs to make the next decision.
-    """
-    import json as _json
-
-    _DROP = {"pdf_url", "receipt_url", "url", "download_url", "emergency_contact"}
-
-    def _clean(value):
-        if isinstance(value, dict):
-            return {k: _clean(v) for k, v in value.items()
-                    if k not in _DROP and not k.endswith("_url")}
-        if isinstance(value, list):
-            return [_clean(v) for v in value]
-        if isinstance(value, str) and len(value) > 160:
-            return value[:160] + "..."
-        return value
-
-    text = _json.dumps(_clean(payload), default=str)
-    if len(text) > limit:
-        text = text[:limit] + "...(truncated)"
-    try:
-        return _json.loads(text)
-    except Exception:  # noqa: BLE001
-        return {"summary": text}
-
-
 
 # tools that mutate data - flagged in the AI monitor
 WRITE_TOOLS = {"hold_slot", "release_slot", "book_appointment", "cancel_appointment",

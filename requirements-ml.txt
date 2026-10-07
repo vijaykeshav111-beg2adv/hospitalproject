@@ -1,0 +1,35 @@
+# ============================================================================
+#  Vijay Vargiya Group of Hospitals - ML Workshop / pretrained-NLP extras
+#  install:  pip install -r requirements.txt -r requirements-ml.txt
+#
+#  These packages power the ORIGINAL ML Workshop that ships with this project
+#  and is kept intentionally:
+#
+#    app/routers/legacy_ml.py   ->  GET  /ml      (workshop landing page)
+#                                   GET  /predict (COVID prediction form)
+#                                   POST /predict (prediction result)
+#    src/                       ->  training / prediction pipeline (model.pkl,
+#                                   preprocessor.pkl)
+#    nlp_pretrained/            ->  POS tagging, NER, GloVe word embeddings and
+#                                   VADER sentiment (demo + tests)
+#
+#  The hospital app in app/ does NOT import any of this, so the core install
+#  stays small and portable. Install this file only when you work on /ml,
+#  /predict or the nlp_pretrained demos.
+#
+#  After installing, download the NLTK corpora once:
+#      python nlp_pretrained/download_nltk_data.py
+# ============================================================================
+
+# ---- data + numeric stack (also what model.pkl was trained with) ----
+pandas>=2.0
+numpy>=1.26
+
+# ---- the trained COVID prediction model (src/pipeline) is unpickled here ----
+scikit-learn>=1.4
+
+# ---- pretrained NLP: tokenising, POS tagging, NER, VADER sentiment ----
+nltk>=3.8
+
+# ---- GloVe-style word embeddings (nlp_pretrained/embedding.py) ----
+gensim>=4.3

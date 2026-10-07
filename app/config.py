@@ -161,6 +161,13 @@ class Settings:
     # gpt-oss models spend part of the budget on hidden reasoning tokens, so a
     # small cap can come back with an empty visible reply.
     groq_max_tokens: int = _int("GROQ_MAX_TOKENS", 1500)
+    # --- document reading (prescription / X-ray / wound photo sent in the chat) ---
+    # Groq's text models cannot see images. Llama 4 Scout was retired on 17 Jul 2026;
+    # the current multimodal models are Qwen 3.8 27B (and the deprecated-but-online
+    # Qwen 3.6 27B), so the reader tries them in that order. Both are optional:
+    # without them the file is still stored and the doctor simply reads it.
+    groq_vision_model: str = os.getenv("GROQ_VISION_MODEL", "qwen/qwen3.8-27b")
+    groq_vision_fallback_model: str = os.getenv("GROQ_VISION_MODEL_FALLBACK", "qwen/qwen3.6-27b")
     slot_hold_minutes: int = _int("SLOT_HOLD_MINUTES", 10)
 
     enable_scheduler: bool = _bool("ENABLE_SCHEDULER", True)

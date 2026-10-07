@@ -30,14 +30,15 @@
 <div class="grid g2">
   <div class="card"><h3>Doctor availability today</h3><div id="docs" class="small muted">Loading…</div></div>
   <div class="card">
-    <h3>Quick collect payment</h3>
-    <div class="row">
-      <input id="invId" placeholder="Invoice ID" style="max-width:130px"/>
-      <input id="payAmt" placeholder="Amount" style="max-width:130px"/>
-      <select id="payMethod" style="max-width:140px">
-        <option>CASH</option><option>UPI</option><option>CARD</option><option>ONLINE</option></select>
-      <button class="btn" onclick="collect()">Collect</button>
+    <div class="flex-between">
+      <h3 style="margin:0">Pending payments</h3>
+      <button class="btn ghost sm" onclick="loadPending()">Refresh</button>
     </div>
+    <div class="row" style="margin-top:8px">
+      <select id="payMethod" style="max-width:120px">
+        <option>CASH</option><option>UPI</option><option>CARD</option><option>ONLINE</option></select>
+      </div>
+    <div id="pending" class="small" style="margin-top:10px">Loading…</div>
     <div id="payMsg" class="small" style="margin-top:10px"></div>
   </div>
 </div>
@@ -46,7 +47,7 @@
 {% block scripts %}
 <script>
 let filter = 'ALL', desk = null;
-if (guard()) load();
+if (guard()) { load(); loadPending(); }
 
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
   filter = b.dataset.f;
@@ -91,7 +92,9 @@ function render() {
       <td>${a.time}<div class="muted small">${a.date}</div></td>
       <td>${a.waiting_minutes !== null && a.waiting_minutes !== undefined ? a.waiting_minutes + ' min' : '—'}</td>
       <td>${badge(a.queue_status)}<div class="muted small">${a.status}</div></td>
-      <td>${a.invoice_id ? `<a href="/ui/billing?invoice=${a.invoice_id}">#${a.invoice_id}</a>` : '—'}</td>
+      <td>${a.invoice_id
+              ? `<a href="/api/v1/invoices/${a.invoice_id}/receipt" target="_blank">#${a.invoice_id}</a>`
+              : '—'}</td>
       <td class="right">
         ${a.queue_status === 'WAITING' ? `<button class="btn sm" onclick="act('check-in',${a.id})">Check in</button>` : ''}
         ${a.queue_status === 'CHECKED_IN' ? `<button class="btn sm dark" onclick="act('start-consultation',${a.id})">Start</button>` : ''}
@@ -109,16 +112,41 @@ async function act(action, id) {
   } catch (e) { toast(e.message, 'err'); }
 }
 
-async function collect() {
+async function collect(invoiceId, balance, amountEl) {
   const msg = document.getElementById('payMsg');
+  const amount = amountEl ? parseFloat(amountEl.value || '0') : balance;
+  if (!amount || amount <= 0) { msg.innerHTML = '<span class="badge bad">Enter an amount first</span>'; return; }
   try {
-    const invId = document.getElementById('invId').value.trim();
     const p = await api('/payments', {method:'POST', body:{
-      invoice_id: invId ? +invId : null, amount: parseFloat(document.getElementById('payAmt').value || '0'),
+      invoice_id: invoiceId, amount: amount,
       method: document.getElementById('payMethod').value, status:'PAID', notify_patient:true}});
-    msg.innerHTML = '<span class="badge ok">Collected ' + fmt.money(p.amount) + ' · ' + p.payment_code + '</span>';
-    load();
+    msg.innerHTML = '<span class="badge ok">Collected ' + fmt.money(p.amount) + ' · ' + p.payment_code +
+      ' · <a href="/api/v1/invoices/' + invoiceId + '/receipt" target="_blank">print receipt</a></span>';
+    toast('Payment recorded for invoice #' + invoiceId, 'ok');
+    load(); loadPending();
   } catch (e) { msg.innerHTML = '<span class="badge bad">' + fmt.esc(e.message) + '</span>'; }
+}
+
+async function loadPending() {
+  const box = document.getElementById('pending');
+  try {
+    const rows = await api('/invoices?pending_only=true&limit=25');
+    if (!rows.length) { box.innerHTML = '<span class="badge ok">No pending payments</span>'; return; }
+    box.innerHTML = '<table><tbody>' + rows.map(i => `
+      <tr>
+        <td><b>${fmt.esc(i.patient_name || '')}</b>
+            <div class="muted small">${i.invoice_number}${i.appointment_id ? ' · appt #' + i.appointment_id : ''}</div></td>
+        <td class="right"><b>${fmt.money(i.balance_amount)}</b>
+            <div class="muted small">of ${fmt.money(i.total_amount)}</div></td>
+        <td class="right" style="white-space:nowrap">
+          <input type="number" min="1" step="1" value="${i.balance_amount}"
+                 style="max-width:92px" id="amt${i.id}"/>
+          <button class="btn sm" onclick="collect(${i.id}, ${i.balance_amount}, document.getElementById('amt${i.id}'))">Collect</button>
+        </td>
+      </tr>`).join('') + '</tbody></table>' +
+      '<div class="muted small" style="margin-top:6px">Amount box ko chhod do to poora balance collect hoga; ' +
+      'aadha paisa lena ho to amount badal do (part payment).</div>';
+  } catch (e) { box.innerHTML = '<span class="badge bad">' + fmt.esc(e.message) + '</span>'; }
 }
 </script>
 {% endblock %}
