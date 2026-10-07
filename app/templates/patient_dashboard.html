@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}My health{% endblock %}
+{% block content %}
+<div class="flex-between">
+  <h2 style="margin:0" id="title">Patient portal</h2>
+  <div class="row">
+    <a class="btn" href="/ui/ai-chat">AI assistant</a>
+    <a class="btn ghost" href="/ui/book">Book appointment</a>
+    <button class="btn ghost sm" onclick="load()">Refresh</button>
+  </div>
+</div>
+<div class="grid g4" id="cards" style="margin-top:14px"></div>
+
+<div class="grid g2">
+  <div class="card"><h3>Upcoming appointments</h3><div id="upcoming">Loading…</div></div>
+  <div class="card"><h3>Notifications</h3><div id="notifs" class="small">Loading…</div></div>
+</div>
+
+<div class="card">
+  <div class="tabs">
+    <button class="on" data-t="history">Appointment history</button>
+    <button data-t="records">Medical records</button>
+    <button data-t="rx">Prescriptions</button>
+    <button data-t="files">Reports &amp; files</button>
+    <button data-t="bills">Bills &amp; payments</button>
+    <button data-t="reviews">My reviews</button>
+  </div>
+  <div id="tabBody" class="small muted">Loading…</div>
+</div>
+
+<div class="card">
+  <h3>Emergency contact &amp; profile</h3>
+  <div id="profile" class="small muted">Loading…</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let profile = null, tab = 'history';
+if (guard()) load();
+
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  tab = b.dataset.t;
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+  renderTab();
+});
+
+async function load() {
+  try {
+    profile = await api('/patients/me');
+    document.getElementById('title').textContent = profile.full_name + ' · ' + profile.patient_code;
+    const s = profile.stats;
+    document.getElementById('cards').innerHTML = [
+      `<div class="kpi"><div class="lbl">Upcoming</div><div class="val">${s.upcoming_appointments}</div></div>`,
+      `<div class="kpi good"><div class="lbl">Completed visits</div><div class="val">${s.completed_appointments}</div></div>`,
+      `<div class="kpi alt"><div class="lbl">Prescriptions</div><div class="val">${s.prescriptions}</div></div>`,
+      `<div class="kpi"><div class="lbl">Reports</div><div class="val">${s.medical_files}</div></div>`,
+      `<div class="kpi good"><div class="lbl">Total billed</div><div class="val">${fmt.money(s.total_billed)}</div></div>`,
+      `<div class="kpi warn"><div class="lbl">Outstanding</div><div class="val">${fmt.money(s.outstanding_amount)}</div></div>`,
+      `<div class="kpi"><div class="lbl">AI chats</div><div class="val">${s.ai_conversations}</div></div>`,
+      `<div class="kpi alt"><div class="lbl">Last visit</div><div class="val" style="font-size:17px">${s.last_visit ? fmt.d(s.last_visit) : '—'}</div></div>`,
+    ].join('');
+
+    document.getElementById('upcoming').innerHTML = (profile.upcoming_appointments || []).length ?
+      `<table><tbody>${profile.upcoming_appointments.map(a => `<tr>
+        <td><b>${fmt.d(a.appointment_date)}</b><div class="muted small">${a.start_time?.slice(0,5)} · token ${a.token_number ?? '-'}</div></td>
+        <td>${fmt.esc(a.doctor?.full_name || '')}<div class="muted small">${fmt.esc(a.specialty?.name || '')}</div></td>
+        <td>${badge(a.status)}</td>
+        <td class="right" style="white-space:nowrap">
+          <button class="btn ghost sm" onclick="reschedule(${a.id})">Reschedule</button>
+          <button class="btn bad sm" onclick="cancelAppt(${a.id})">Cancel</button></td></tr>`).join('')}
+        </tbody></table>` : '<div class="muted">No upcoming appointment. <a href="/ui/book">Book one</a>.</div>';
+
+    const dash = await api('/admin/dashboard/patient');
+    document.getElementById('notifs').innerHTML = (dash.notifications || []).length ?
+      dash.notifications.map(n => `<div style="border-bottom:1px solid var(--line);padding:7px 0">
+        <span class="badge info">${n.channel}</span> ${fmt.esc(n.message.slice(0,150))}
+        <div class="muted">${fmt.dt(n.created_at)}</div></div>`).join('') : '<span class="muted">Nothing yet.</span>';
+
+    document.getElementById('profile').innerHTML = `
+      <div class="grid g2"><div>
+        <div><b>Phone:</b> ${fmt.esc(profile.phone)}</div>
+        <div><b>Email:</b> ${fmt.esc(profile.email || '—')}</div>
+        <div><b>Age / Gender:</b> ${profile.age || '—'} / ${fmt.esc(profile.gender || '—')}</div>
+        <div><b>Blood group:</b> ${fmt.esc(profile.blood_group || '—')}</div>
+        <div><b>Address:</b> ${fmt.esc([profile.address_line, profile.city, profile.state, profile.pincode].filter(Boolean).join(', ') || '—')}</div>
+      </div><div>
+        <div><b>Emergency contact:</b> ${fmt.esc(profile.emergency_contact_name || '—')}
+          ${profile.emergency_contact_phone ? '(' + fmt.esc(profile.emergency_contact_phone) + ')' : ''}
+          ${fmt.esc(profile.emergency_contact_relation || '')}</div>
+        <div><b>Allergies:</b> ${fmt.esc(profile.allergies || 'none recorded')}</div>
+        <div><b>Chronic conditions:</b> ${fmt.esc(profile.chronic_conditions || 'none recorded')}</div>
+      </div></div>`;
+    renderTab();
+  } catch (e) {
+    toast(e.message, 'err');
+    document.getElementById('tabBody').innerHTML = '<span class="badge bad">' + fmt.esc(e.message) + '</span>';
+  }
+}
+
+function renderTab() {
+  const body = document.getElementById('tabBody');
+  const p = profile || {};
+  if (tab === 'history') {
+    const rows = (p.previous_appointments || []);
+    body.innerHTML = rows.length ? `<table><thead><tr><th>Date</th><th>Doctor</th><th>Reason</th><th>Status</th></tr></thead>
+      <tbody>${rows.map(a => `<tr><td>${fmt.d(a.appointment_date)} ${a.start_time?.slice(0,5)}</td>
+      <td>${fmt.esc(a.doctor?.full_name || '')}</td><td>${fmt.esc(a.reason || '')}</td><td>${badge(a.status)}</td></tr>`).join('')}
+      </tbody></table>` : '<div class="muted">No past visits.</div>';
+  } else if (tab === 'records') {
+    body.innerHTML = (p.medical_records || []).length ? `<div class="timeline">${p.medical_records.map(r => `
+      <div class="t"><b>${fmt.esc(r.title)}</b> <span class="badge mute">${r.record_type}</span>
+      <div class="muted">${fmt.d(r.recorded_at)} · v${r.version}</div>
+      <div>${fmt.esc(r.description || '')}</div></div>`).join('')}</div>` : '<div class="muted">No records yet.</div>';
+  } else if (tab === 'rx') {
+    body.innerHTML = (p.prescriptions || []).length ? `<table><thead><tr><th>Code</th><th>Doctor</th><th>Issued</th><th>Status</th><th></th></tr></thead>
+      <tbody>${p.prescriptions.map(r => `<tr><td><b>${r.prescription_code}</b></td>
+      <td>${fmt.esc(r.doctor_name || '')}</td><td>${fmt.d(r.issued_at)}</td><td>${badge(r.status)}</td>
+      <td class="right"><a class="btn ghost sm" target="_blank"
+        href="/api/v1/prescriptions/${r.id}/pdf?token=${Auth.token()}">PDF</a></td></tr>`).join('')}</tbody></table>`
+      : '<div class="muted">No prescriptions.</div>';
+  } else if (tab === 'files') {
+    body.innerHTML = (p.files || []).length ? `<table><thead><tr><th>Title</th><th>Category</th><th>Uploaded</th><th></th></tr></thead>
+      <tbody>${p.files.map(f => `<tr><td>${fmt.esc(f.title)}</td><td>${f.category}</td><td>${fmt.d(f.created_at)}</td>
+      <td class="right"><a class="btn ghost sm" target="_blank"
+        href="/api/v1/medical-files/${f.id}/download?token=${Auth.token()}">Open</a></td></tr>`).join('')}</tbody></table>`
+      : '<div class="muted">No reports uploaded.</div>';
+  } else if (tab === 'bills') {
+    body.innerHTML = `<table><thead><tr><th>Invoice</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th></th></tr></thead>
+      <tbody>${(p.invoices || []).map(i => `<tr><td>${i.invoice_number}</td><td>${fmt.money(i.total_amount)}</td>
+      <td>${fmt.money(i.paid_amount)}</td><td>${fmt.money(i.balance_amount)}</td><td>${badge(i.status)}</td>
+      <td class="right"><a class="btn ghost sm" target="_blank" href="/api/v1/invoices/${i.id}/receipt?token=${Auth.token()}">Receipt</a>
+      ${i.balance_amount > 0 ? `<button class="btn sm" onclick="payOnline(${i.id}, ${i.balance_amount})">Pay</button>` : ''}</td></tr>`).join('')}
+      </tbody></table>
+      <h4>Payments</h4>
+      <table><tbody>${(p.payments || []).map(x => `<tr><td>${x.payment_code}</td><td>${fmt.money(x.amount)}</td>
+      <td>${x.method}</td><td>${badge(x.status)}</td><td>${fmt.d(x.paid_at)}</td></tr>`).join('')}</tbody></table>`;
+  } else if (tab === 'reviews') {
+    body.innerHTML = (p.reviews || []).length ? `<table><thead><tr><th>Rating</th><th>Comment</th><th>Status</th></tr></thead>
+      <tbody>${p.reviews.map(r => `<tr><td>${'★'.repeat(r.rating || 0)}</td><td>${fmt.esc(r.comment || '')}</td>
+      <td>${badge(r.status)}</td></tr>`).join('')}</tbody></table>` : '<div class="muted">No reviews yet.</div>';
+  }
+}
+
+async function payOnline(invoiceId, amount) {
+  try {
+    const r = await api('/payments/online/initiate', {method:'POST', body:{invoice_id: invoiceId, amount}});
+    toast('Gateway reference ' + r.gateway_reference + ' created (PENDING). Wire a PSP to complete.', 'warn');
+    load();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function cancelAppt(id) {
+  if (!confirm('Cancel this appointment?')) return;
+  try { await api('/appointments/' + id + '/cancel', {method:'POST', body:{reason:'Patient cancelled via portal'}});
+        toast('Appointment cancelled', 'ok'); load(); } catch (e) { toast(e.message, 'err'); }
+}
+
+async function reschedule(id) {
+  try {
+    const slots = await api('/slots/available?limit=15');
+    if (!slots.length) return toast('No slots available', 'warn');
+    const pick = prompt('Pick a new slot number:\n' + slots.map((s,i) => `${i+1}. ${s.label} (${s.doctor_name})`).join('\n'));
+    const idx = parseInt(pick, 10) - 1;
+    if (isNaN(idx) || !slots[idx]) return;
+    await api('/appointments/' + id + '/reschedule', {method:'POST', body:{new_slot_id: slots[idx].slot_id}});
+    toast('Rescheduled', 'ok'); load();
+  } catch (e) { toast(e.message, 'err'); }
+}
+</script>
+{% endblock %}

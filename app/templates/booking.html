@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Book appointment{% endblock %}
+{% block content %}
+<h2>Book an appointment</h2>
+<p class="small muted">Reception / staff flow: identify the patient, pick the specialty, choose a doctor,
+select a live slot and confirm. Slots come from the slot engine (schedules, breaks, leave, holidays, capacity).</p>
+
+<div class="grid g2">
+  <div class="card">
+    <h3>1 · Patient</h3>
+    <div class="row">
+      <input id="pq" placeholder="search name / phone / patient id"
+             onkeydown="if(event.key==='Enter')findPatient()"/>
+      <button class="btn" onclick="findPatient()">Search</button>
+      <a class="btn ghost" href="/ui/patients">New patient</a>
+    </div>
+    <div id="pResults" class="small" style="margin-top:10px"></div>
+    <div id="chosen" class="small" style="margin-top:10px"></div>
+  </div>
+
+  <div class="card">
+    <h3>2 · Specialty &amp; doctor</h3>
+    <label>Specialty</label><select id="spec"></select>
+    <label>Doctor</label><select id="doctor"></select>
+    <label>Reason / concern</label><input id="reason" placeholder="e.g. fever since 3 days"/>
+    <div class="row" style="margin-top:10px">
+      <button class="btn ghost sm" onclick="loadDoctors()">Reload doctors</button>
+      <label class="row" style="gap:6px;text-transform:none;font-size:12.5px">
+        <input type="checkbox" id="notify" checked style="width:auto"/> Send WhatsApp confirmation</label>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="flex-between"><h3 style="margin:0">3 · Available slots</h3>
+    <div class="row small muted">
+      <span>Days ahead</span><input id="days" type="number" value="7" min="1" max="30" style="width:80px"/>
+      <button class="btn ghost sm" onclick="loadSlots()">Refresh</button>
+      <span id="holdInfo"></span>
+    </div>
+  </div>
+  <div id="slots" class="grid g3" style="margin-top:12px"><div class="muted small">Pick a doctor first.</div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let patient = null, hold = null;
+if (guard()) init();
+
+async function init() {
+  const specs = await api('/specialties');
+  const sel = document.getElementById('spec');
+  sel.innerHTML = '<option value="">All specialties</option>' +
+    specs.map(s => `<option value="${s.id}">${fmt.esc(s.name)} · ₹${s.consultation_fee}</option>`).join('');
+  sel.onchange = loadDoctors;
+  const qp = new URLSearchParams(location.search);
+  if (qp.get('doctor_id')) { await loadDoctors(); document.getElementById('doctor').value = qp.get('doctor_id'); loadSlots(); }
+  else await loadDoctors();
+}
+
+async function findPatient() {
+  const q = document.getElementById('pq').value.trim();
+  if (!q) return;
+  const rows = await api('/patients/search/suggest?q=' + encodeURIComponent(q));
+  document.getElementById('pResults').innerHTML = rows.length ? rows.map(r => `
+    <div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:6px 0">
+      <span>${fmt.esc(r.label)}</span>
+      <button class="btn sm ghost" onclick='pickPatient(${JSON.stringify(r)})'>Select</button></div>`).join('')
+    : '<span class="muted">No match. Register the patient first.</span>';
+}
+
+function pickPatient(r) {
+  patient = r;
+  document.getElementById('chosen').innerHTML =
+    `<span class="badge ok">Selected</span> <b>${fmt.esc(r.name)}</b> · ${r.patient_code} · ${r.phone}`;
+}
+
+async function loadDoctors() {
+  const specId = document.getElementById('spec').value;
+  const doctors = await api('/doctors?active_only=true' + (specId ? '&specialty_id=' + specId : ''));
+  const sel = document.getElementById('doctor');
+  sel.innerHTML = doctors.map(d => `<option value="${d.id}" data-name="${fmt.esc(d.full_name)}">
+    ${fmt.esc(d.full_name)} · ₹${Number(d.consultation_fee).toFixed(0)} · ${d.experience_years||0}y</option>`).join('')
+    || '<option value="">No doctors in this specialty</option>';
+  sel.onchange = loadSlots;
+  loadSlots();
+}
+
+async function loadSlots() {
+  const doctorId = document.getElementById('doctor').value;
+  const days = document.getElementById('days').value || 7;
+  const box = document.getElementById('slots');
+  if (!doctorId) { box.innerHTML = '<div class="muted small">No doctor selected.</div>'; return; }
+  box.innerHTML = '<div class="muted small">Searching live slots…</div>';
+  try {
+    const slots = await api(`/slots/available?doctor_id=${doctorId}&limit=24&to_date=` +
+      new Date(Date.now() + days*864e5).toISOString().slice(0,10));
+    box.innerHTML = slots.length ? slots.map(s => `
+      <div style="border:1px solid var(--line);border-radius:12px;padding:11px">
+        <div class="flex-between"><b>${s.label}</b><span class="badge ok">₹${Number(s.fee).toFixed(0)}</span></div>
+        <div class="small muted">${fmt.esc(s.doctor_name)} · ${fmt.esc(s.specialty_name || '')}</div>
+        <button class="btn sm" style="margin-top:8px" onclick="holdSlot(${s.slot_id})">Hold &amp; book</button>
+      </div>`).join('') : '<div class="muted small">No open slots in this window.</div>';
+  } catch (e) { box.innerHTML = '<div class="badge bad">' + fmt.esc(e.message) + '</div>'; }
+}
+
+async function holdSlot(slotId) {
+  if (!patient) return toast('Select a patient first', 'warn');
+  try {
+    hold = await api('/slots/hold', {method:'POST', body:{slot_id: slotId, patient_id: patient.id}});
+    document.getElementById('holdInfo').innerHTML =
+      `<span class="badge warn">held until ${fmt.dt(hold.expires_at)}</span>`;
+    book(slotId, hold.hold_token);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function book(slotId, token) {
+  try {
+    const appt = await api('/appointments', {method:'POST', body:{
+      patient_id: patient.id, slot_id: slotId, hold_token: token, source:'RECEPTION',
+      reason: document.getElementById('reason').value || null,
+      send_notifications: document.getElementById('notify').checked}});
+    toast('Booked ' + appt.appointment_code + ' · token ' + appt.token_number, 'ok');
+    const box = document.createElement('div'); box.className = 'modal';
+    box.innerHTML = `<div class="box"><h3>Appointment confirmed</h3>
+      <div class="grid g2 small">
+        <div><b>Patient:</b> ${fmt.esc(appt.patient_name)} (${appt.patient_code})</div>
+        <div><b>Doctor:</b> ${fmt.esc(appt.doctor_name)}</div>
+        <div><b>Date / time:</b> ${fmt.d(appt.appointment_date)} ${appt.start_time?.slice(0,5)}</div>
+        <div><b>Token:</b> ${appt.token_number}</div>
+        <div><b>Appointment ID:</b> ${appt.appointment_code}</div>
+        <div><b>Invoice:</b> #${appt.invoice_id || '-'}</div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        ${appt.invoice_id ? `<a class="btn" href="/ui/billing?invoice=${appt.invoice_id}">Collect payment</a>` : ''}
+        <button class="btn ghost" onclick="this.closest('.modal').remove();loadSlots()">Done</button>
+      </div></div>`;
+    document.body.appendChild(box);
+  } catch (e) { toast(e.message, 'err'); }
+}
+</script>
+{% endblock %}

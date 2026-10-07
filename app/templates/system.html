@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}System &amp; jobs{% endblock %}
+{% block content %}
+<div class="flex-between">
+  <h2 style="margin:0">System, background jobs &amp; settings</h2>
+  <div class="row"><button class="btn ghost sm" onclick="load()">Refresh</button></div>
+</div>
+
+<div class="grid g3" style="margin-top:14px">
+  <div class="card"><h3>Health</h3><div id="health" class="small muted">Loading…</div></div>
+  <div class="card"><h3>Table row counts</h3><div id="tables" class="small muted">Loading…</div></div>
+  <div class="card"><h3>Settings</h3><div id="settings" class="small muted">Loading…</div></div>
+</div>
+
+<div class="card">
+  <h3>Background jobs (APScheduler worker)</h3>
+  <table>
+    <thead><tr><th>Job</th><th>Schedule</th><th>Last run</th><th>Status</th><th class="right">Run now</th></tr></thead>
+    <tbody id="jobs"><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h3>Recent job runs</h3>
+  <div id="runs" class="small muted">Loading…</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+if (guard()) load();
+
+async function load() {
+  try {
+    const h = await api('/admin/health', {});
+    document.getElementById('health').innerHTML = `
+      <div>Service: <span class="badge ok">${h.service}</span></div>
+      <div>Database: <span class="badge ${h.database.status === 'up' ? 'ok' : 'bad'}">${h.database.status}</span>
+        <b>${h.database.backend || ''}</b></div>
+      <div class="muted">${fmt.esc(h.database.database || h.database.error || '')}</div>`;
+
+    const sys = await api('/admin/system');
+    document.getElementById('tables').innerHTML = Object.entries(sys.tables).sort((a,b)=>b[1]-a[1])
+      .map(([k,v]) => `<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line)">
+        <code>${k}</code><b>${fmt.n(v)}</b></div>`).join('');
+
+    const settings = await api('/admin/settings');
+    document.getElementById('settings').innerHTML = settings.map(s =>
+      `<div style="border-bottom:1px solid var(--line);padding:5px 0">
+        <code>${s.key}</code> = <b>${fmt.esc(s.value)}</b><div class="muted">${fmt.esc(s.description||'')}</div>
+      </div>`).join('');
+
+    const jobs = await api('/admin/jobs');
+    const runs = await api('/admin/jobs/runs?limit=40');
+    const lastByJob = {};
+    runs.forEach(r => { if (!lastByJob[r.job]) lastByJob[r.job] = r; });
+    document.getElementById('jobs').innerHTML = jobs.map(j => {
+      const last = lastByJob[j.name];
+      return `<tr><td><code>${j.name}</code></td><td class="small">${fmt.esc(j.schedule)}</td>
+        <td class="small">${last ? fmt.dt(last.started_at) + ' · ' + (last.duration_ms||0) + ' ms' : 'never'}</td>
+        <td>${last ? badge(last.status) : '<span class="badge mute">idle</span>'}</td>
+        <td class="right"><button class="btn sm" onclick="runJob('${j.name}')">Run</button></td></tr>`;
+    }).join('');
+    document.getElementById('runs').innerHTML = runs.length ? `<table><thead><tr><th>Job</th><th>Status</th>
+      <th>Started</th><th>ms</th><th>Details</th></tr></thead><tbody>${runs.map(r => `<tr>
+      <td><code>${r.job}</code></td><td>${badge(r.status)}</td><td>${fmt.dt(r.started_at)}</td>
+      <td>${r.duration_ms ?? ''}</td><td class="small">${fmt.esc(JSON.stringify(r.details||r.error||'').slice(0,120))}</td>
+      </tr>`).join('')}</tbody></table>` : '<span class="muted">No job runs yet.</span>';
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function runJob(name) {
+  toast('Running ' + name + '…');
+  try {
+    const r = await api('/admin/jobs/' + name + '/run', {method:'POST'});
+    toast(name + ' → ' + r.status + ' (' + r.duration_ms + ' ms)', r.status === 'SUCCESS' ? 'ok' : 'err');
+    load();
+  } catch (e) { toast(e.message, 'err'); }
+}
+</script>
+{% endblock %}

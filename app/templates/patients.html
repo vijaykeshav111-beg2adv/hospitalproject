@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Patients{% endblock %}
+{% block content %}
+<div class="flex-between">
+  <h2 style="margin:0">Patient registry</h2>
+  <div class="row">
+    <input id="q" placeholder="search name / phone / patient ID" style="min-width:260px"
+           onkeydown="if(event.key==='Enter')load()"/>
+    <button class="btn" onclick="load()">Search</button>
+    <button class="btn ghost" onclick="toggleForm()">+ Register patient</button>
+  </div>
+</div>
+
+<div class="card hide" id="regForm">
+  <h3>Register a patient</h3>
+  <div class="grid g3">
+    <div><label>Full name *</label><input id="f_name"/></div>
+    <div><label>Mobile *</label><input id="f_phone"/></div>
+    <div><label>Email</label><input id="f_email"/></div>
+    <div><label>Date of birth</label><input id="f_dob" type="date"/></div>
+    <div><label>Age</label><input id="f_age" type="number"/></div>
+    <div><label>Gender</label><select id="f_gender"><option value="">-</option><option>Male</option><option>Female</option><option>Other</option></select></div>
+    <div><label>Blood group</label><input id="f_blood"/></div>
+    <div><label>City</label><input id="f_city"/></div>
+    <div><label>Pincode</label><input id="f_pin"/></div>
+    <div><label>Address</label><input id="f_addr"/></div>
+    <div><label>Allergies</label><input id="f_allergy"/></div>
+    <div><label>Chronic conditions</label><input id="f_chronic"/></div>
+    <div><label>Emergency contact name</label><input id="f_ec_name"/></div>
+    <div><label>Emergency phone</label><input id="f_ec_phone"/></div>
+    <div><label>Relation</label><input id="f_ec_rel"/></div>
+  </div>
+  <div class="row" style="margin-top:14px">
+    <label class="row" style="gap:6px;text-transform:none"><input type="checkbox" id="f_portal" style="width:auto"/>
+      Create portal login</label>
+    <input id="f_password" type="password" placeholder="portal password" style="max-width:220px"/>
+    <button class="btn" id="saveBtn" onclick="save()">Save patient</button>
+  </div>
+  <div id="formMsg" class="small" style="margin-top:10px"></div>
+</div>
+
+<div class="card">
+  <table>
+    <thead><tr><th>Patient</th><th>Contact</th><th>Age / Gender</th><th>Blood</th><th>City</th>
+      <th>Registered</th><th class="right">Actions</th></tr></thead>
+    <tbody id="rows"><tr><td colspan="7" class="muted">Loading…</td></tr></tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+if (guard()) load();
+function toggleForm(){ document.getElementById('regForm').classList.toggle('hide'); }
+
+async function load() {
+  const q = document.getElementById('q').value.trim();
+  const rows = await api('/patients' + (q ? '?search=' + encodeURIComponent(q) : ''));
+  const tb = document.getElementById('rows');
+  tb.innerHTML = rows.length ? rows.map(p => `
+    <tr>
+      <td><b>${fmt.esc(p.full_name)}</b><div class="muted small">${p.patient_code}</div></td>
+      <td>${fmt.esc(p.phone)}<div class="muted small">${fmt.esc(p.email||'')}</div></td>
+      <td>${p.age ?? '—'} / ${fmt.esc(p.gender||'—')}</td>
+      <td>${fmt.esc(p.blood_group||'—')}</td>
+      <td>${fmt.esc(p.city||'—')}</td>
+      <td class="small">${fmt.d(p.created_at)}</td>
+      <td class="right" style="white-space:nowrap">
+        <button class="btn ghost sm" onclick="openProfile(${p.id})">Profile</button>
+        <a class="btn sm" href="/ui/book?patient_id=${p.id}">Book</a>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="7" class="muted">No patients found.</td></tr>';
+}
+
+async function save() {
+  const v = id => document.getElementById(id).value.trim();
+  const body = {
+    full_name: v('f_name'), phone: v('f_phone'), email: v('f_email') || null,
+    date_of_birth: v('f_dob') || null, age: v('f_age') ? +v('f_age') : null, gender: v('f_gender') || null,
+    blood_group: v('f_blood') || null, city: v('f_city') || null, pincode: v('f_pin') || null,
+    address_line: v('f_addr') || null, allergies: v('f_allergy') || null,
+    chronic_conditions: v('f_chronic') || null, emergency_contact_name: v('f_ec_name') || null,
+    emergency_contact_phone: v('f_ec_phone') || null, emergency_contact_relation: v('f_ec_rel') || null,
+    create_portal_login: document.getElementById('f_portal').checked,
+    portal_password: v('f_password') || null,
+  };
+  const msg = document.getElementById('formMsg');
+  try {
+    const p = await api('/patients', {method:'POST', body});
+    msg.innerHTML = `<span class="badge ok">Registered ${p.patient_code}</span>`;
+    toast('Patient registered: ' + p.patient_code, 'ok');
+    load();
+  } catch (e) { msg.innerHTML = '<span class="badge bad">' + fmt.esc(e.message) + '</span>'; }
+}
+
+async function openProfile(id) {
+  try {
+    const [p, summary] = await Promise.all([
+      api('/patients/' + id), api('/patients/' + id + '/summary')]);
+    const box = document.createElement('div'); box.className = 'modal';
+    box.innerHTML = `<div class="box">
+      <div class="flex-between"><h3 style="margin:0">${fmt.esc(p.full_name)} · ${p.patient_code}</h3>
+        <button class="btn ghost sm" onclick="this.closest('.modal').remove()">Close</button></div>
+      <p class="small muted">${fmt.esc(summary.text_summary)}</p>
+      <div class="grid g3 small">
+        <div class="kpi"><div class="lbl">Visits</div><div class="val">${p.stats.total_appointments}</div></div>
+        <div class="kpi"><div class="lbl">Billed</div><div class="val">${fmt.money(p.stats.total_billed)}</div></div>
+        <div class="kpi warn"><div class="lbl">Outstanding</div><div class="val">${fmt.money(p.stats.outstanding_amount)}</div></div>
+      </div>
+      <h4>Upcoming</h4>
+      <div class="small">${(p.upcoming_appointments||[]).map(a => `<div>${fmt.d(a.appointment_date)} ${a.start_time?.slice(0,5)} · ${fmt.esc(a.doctor?.full_name||'')} ${badge(a.status)}</div>`).join('') || '<span class="muted">none</span>'}</div>
+      <h4>Recent history</h4>
+      <div class="timeline small">${(p.previous_appointments||[]).slice(0,6).map(a => `<div class="t">
+        ${fmt.d(a.appointment_date)} · ${fmt.esc(a.doctor?.full_name||'')} <span class="badge mute">${a.status}</span>
+        <div class="muted">${fmt.esc(a.reason||'')}</div></div>`).join('')}</div>
+      <h4>Prescriptions</h4>
+      <div class="small">${(p.prescriptions||[]).map(r => `<a target="_blank" href="/api/v1/prescriptions/${r.id}/pdf?token=${Auth.token()}">${r.prescription_code}</a>`).join(' · ') || '<span class="muted">none</span>'}</div>
+      <h4>Files</h4>
+      <div class="small">${(p.files||[]).map(f => `<a target="_blank" href="/api/v1/medical-files/${f.id}/download?token=${Auth.token()}">${fmt.esc(f.title)}</a>`).join(' · ') || '<span class="muted">none</span>'}</div>
+      <h4>AI conversations</h4>
+      <div class="small">${(p.ai_conversations||[]).map(c => `<div>${fmt.dt(c.started_at)} · ${c.status} · ${c.message_count} msgs</div>`).join('') || '<span class="muted">none</span>'}</div>
+    </div>`;
+    document.body.appendChild(box);
+  } catch (e) { toast(e.message, 'err'); }
+}
+</script>
+{% endblock %}

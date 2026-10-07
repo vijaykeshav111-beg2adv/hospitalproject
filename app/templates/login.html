@@ -1,0 +1,355 @@
+{% extends "base.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+
+<div class="grid g2">
+
+  <div class="card">
+
+    <h2>Sign in</h2>
+
+    <p class="small muted">
+      Role-based access: patient portal, doctor console,
+      reception desk, accounts and admin.
+    </p>
+
+    <label>Email</label>
+
+    <input
+      id="email"
+      type="email"
+      placeholder="you@example.com"
+      autocomplete="username"
+    />
+
+    <label>Password</label>
+
+    <input
+      id="password"
+      type="password"
+      placeholder="••••••••"
+      autocomplete="current-password"
+      onkeydown="if(event.key==='Enter')doLogin()"
+    />
+
+    <div
+      class="row"
+      style="margin-top:14px"
+    >
+
+      <button
+        class="btn"
+        id="loginBtn"
+        onclick="doLogin()"
+      >
+        Sign in
+      </button>
+
+      <a
+        class="btn ghost"
+        href="/ui/forgot-password"
+      >
+        Forgot password
+      </a>
+
+      <a
+        class="btn ghost"
+        href="/ui/register"
+      >
+        Register
+      </a>
+
+    </div>
+
+    <div
+      id="msg"
+      class="small"
+      style="margin-top:12px"
+    ></div>
+
+  </div>
+
+
+  <div class="card">
+
+    <h2>Demo logins</h2>
+
+    <p class="small muted">
+      Seeded by
+      <code>python -m app.seed</code>.
+      Click to fill the form.
+    </p>
+
+    <table>
+
+      <thead>
+        <tr>
+          <th>Role</th>
+          <th>Email</th>
+          <th>Password</th>
+        </tr>
+      </thead>
+
+      <tbody id="demoRows"></tbody>
+
+    </table>
+
+    <p
+      class="small muted"
+      style="margin-top:10px"
+    >
+      Security: passwords are PBKDF2-SHA256 hashed,
+      JWTs are short-lived with refresh rotation,
+      failed logins lock the account and every attempt
+      is written to the login-activity + audit trail.
+    </p>
+
+  </div>
+
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+
+<script>
+
+const demos = [
+  [
+    'SUPER_ADMIN',
+    'superadmin@vijayvargiiyahospital.in',
+    'SuperAdmin@123'
+  ],
+  [
+    'ADMIN',
+    'admin@vijayvargiiyahospital.in',
+    'Admin@123'
+  ],
+  [
+    'DOCTOR',
+    'dr.arjunmehra@vijayvargiyahospital.in',
+    'Doctor@123'
+  ],
+  [
+    'RECEPTIONIST',
+    'reception@vijayvargiyahospital.in',
+    'Reception@123'
+  ],
+  [
+    'ACCOUNTANT',
+    'accounts@vijayvargiyahospital.in',
+    'Accounts@123'
+  ],
+  [
+    'PATIENT',
+    'ramesh.yadav@example.com',
+    'Patient@123'
+  ]
+];
+
+
+document.getElementById('demoRows').innerHTML =
+  demos.map(([role, email, password]) => `
+
+    <tr>
+
+      <td>
+        <span class="badge info">
+          ${role}
+        </span>
+      </td>
+
+      <td class="small">
+        ${email}
+      </td>
+
+      <td class="small">
+
+        <a
+          href="#"
+          onclick="fill('${email}','${password}');return false"
+        >
+          ${password}
+        </a>
+
+      </td>
+
+    </tr>
+
+  `).join('');
+
+
+function fill(email, password) {
+
+  document.getElementById('email').value = email;
+
+  document.getElementById('password').value = password;
+
+}
+
+
+/*
+ * Store the access token for the existing API client
+ * AND create the UI authentication cookie.
+ *
+ * The cookie allows normal browser navigation to:
+ *
+ * /ui/patient
+ * /ui/doctor
+ * /ui/admin
+ * /ui/appointments
+ * /ui/ai-chat
+ *
+ * without requiring an Authorization header.
+ */
+function saveUIAccessCookie(accessToken) {
+
+  if (!accessToken) {
+    return;
+  }
+
+  document.cookie =
+    'vvh_access_token=' +
+    encodeURIComponent(accessToken) +
+    '; Path=/; SameSite=Lax';
+}
+
+
+/*
+ * Remove UI authentication cookie.
+ */
+function clearUIAccessCookie() {
+
+  document.cookie =
+    'vvh_access_token=; Path=/; Max-Age=0; SameSite=Lax';
+}
+
+
+async function doLogin() {
+
+  const btn =
+    document.getElementById('loginBtn');
+
+  const msg =
+    document.getElementById('msg');
+
+  btn.disabled = true;
+
+  msg.textContent = '';
+
+
+  try {
+
+    const data = await api(
+      '/auth/login',
+      {
+        method: 'POST',
+
+        body: {
+          email:
+            document
+              .getElementById('email')
+              .value
+              .trim(),
+
+          password:
+            document
+              .getElementById('password')
+              .value
+        }
+      }
+    );
+
+
+    /*
+     * Existing application authentication.
+     */
+    if (
+      typeof Auth !== 'undefined' &&
+      Auth &&
+      typeof Auth.save === 'function'
+    ) {
+      Auth.save(data);
+    }
+
+
+    /*
+     * New UI authentication bridge.
+     */
+    saveUIAccessCookie(
+      data.access_token
+    );
+
+
+    msg.innerHTML =
+      '<span class="badge ok">' +
+      'Welcome ' +
+      fmt.esc(data.user.full_name) +
+      '</span>';
+
+
+    const role =
+      data.user.role_name;
+
+
+    const next =
+      new URLSearchParams(
+        location.search
+      ).get('next');
+
+
+    const home = {
+      SUPER_ADMIN:
+        '/ui/super-admin',
+
+      ADMIN:
+        '/ui/admin',
+
+      DOCTOR:
+        '/ui/doctor',
+
+      RECEPTIONIST:
+        '/ui/reception',
+
+      ACCOUNTANT:
+        '/ui/billing',
+
+      PATIENT:
+        '/ui/patient'
+
+    }[role] || '/ui';
+
+
+    setTimeout(
+      () => {
+        location.href =
+          next || home;
+      },
+      400
+    );
+
+
+  } catch (e) {
+
+    msg.innerHTML =
+      '<span class="badge bad">' +
+      fmt.esc(
+        e.message ||
+        'Login failed'
+      ) +
+      '</span>';
+
+  } finally {
+
+    btn.disabled = false;
+
+  }
+
+}
+
+</script>
+
+{% endblock %}

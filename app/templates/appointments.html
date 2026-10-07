@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Appointments{% endblock %}
+{% block content %}
+<div class="flex-between">
+  <h2 style="margin:0">Appointments</h2>
+  <div class="row">
+    <a class="btn" href="/ui/book">New booking</a>
+    <button class="btn ghost sm" onclick="load()">Refresh</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="grid g4">
+    <div><label>From</label><input id="from" type="date"/></div>
+    <div><label>To</label><input id="to" type="date"/></div>
+    <div><label>Status</label><select id="status">
+      <option value="">All</option><option>PENDING</option><option>CONFIRMED</option><option>COMPLETED</option>
+      <option>CANCELLED</option><option>NO_SHOW</option><option>RESCHEDULED</option></select></div>
+    <div><label>Doctor</label><select id="doctor"><option value="">All</option></select></div>
+    <div><label>Search</label><input id="s" placeholder="code / patient name / phone"
+      onkeydown="if(event.key==='Enter')load()"/></div>
+    <div><label>Specialty</label><select id="spec"><option value="">All</option></select></div>
+    <div style="align-self:flex-end"><button class="btn" onclick="load()">Apply filters</button></div>
+  </div>
+</div>
+
+<div class="card">
+  <table>
+    <thead><tr><th>Code</th><th>Patient</th><th>Doctor</th><th>When</th><th>Source</th><th>Status</th>
+      <th>Queue</th><th class="right">Actions</th></tr></thead>
+    <tbody id="rows"><tr><td colspan="8" class="muted">Loading…</td></tr></tbody>
+  </table>
+  <div id="count" class="small muted" style="margin-top:8px"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+if (guard()) init();
+
+async function init() {
+  const [doctors, specs] = await Promise.all([api('/doctors?active_only=true'), api('/specialties')]);
+  document.getElementById('doctor').innerHTML += doctors.map(d =>
+    `<option value="${d.id}">${fmt.esc(d.full_name)}</option>`).join('');
+  document.getElementById('spec').innerHTML += specs.map(s =>
+    `<option value="${s.id}">${fmt.esc(s.name)}</option>`).join('');
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('from').value = new Date(Date.now() - 7*864e5).toISOString().slice(0,10);
+  document.getElementById('to').value = new Date(Date.now() + 14*864e5).toISOString().slice(0,10);
+  load();
+}
+
+async function load() {
+  const p = new URLSearchParams();
+  ['from','to','status','doctor','spec','s'].forEach(id => {
+    const v = document.getElementById(id).value;
+    if (!v) return;
+    const key = {from:'from_date', to:'to_date', status:'status_filter', doctor:'doctor_id',
+                 spec:'specialty_id', s:'search'}[id];
+    p.set(key, v);
+  });
+  const rows = await api('/appointments?' + p.toString());
+  document.getElementById('count').textContent = rows.length + ' appointment(s)';
+  const tb = document.getElementById('rows');
+  tb.innerHTML = rows.length ? rows.map(a => `
+    <tr>
+      <td class="small"><b>${a.appointment_code}</b><div class="muted">#${a.id} · token ${a.token_number ?? '-'}</div></td>
+      <td><b>${fmt.esc(a.patient_name)}</b><div class="muted small">${a.patient_code || ''} · ${fmt.esc(a.patient_phone||'')}</div></td>
+      <td>${fmt.esc(a.doctor_name)}<div class="muted small">${fmt.esc(a.specialty_name||'')}</div></td>
+      <td>${fmt.d(a.appointment_date)}<div class="muted small">${a.start_time?.slice(0,5)}</div></td>
+      <td><span class="badge mute">${a.source}</span></td>
+      <td>${badge(a.status)}</td>
+      <td>${badge(a.queue_status)}</td>
+      <td class="right" style="white-space:nowrap">
+        ${a.status === 'PENDING' ? `<button class="btn sm" onclick="act(${a.id},'confirm')">Confirm</button>` : ''}
+        ${['PENDING','CONFIRMED'].includes(a.status) ? `
+          <button class="btn ghost sm" onclick="reschedule(${a.id})">Reschedule</button>
+          <button class="btn bad sm" onclick="act(${a.id},'cancel')">Cancel</button>` : ''}
+        <a class="btn ghost sm" href="/ui/clinical?appointment=${a.id}">Open</a>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="8" class="muted">No appointments match.</td></tr>';
+}
+
+async function act(id, action) {
+  try {
+    if (action === 'cancel') {
+      const reason = prompt('Cancellation reason?') || 'Cancelled by staff';
+      await api(`/appointments/${id}/cancel`, {method:'POST', body:{reason}});
+    } else {
+      await api(`/appointments/${id}/${action}`, {method:'POST'});
+    }
+    toast('Updated', 'ok'); load();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function reschedule(id) {
+  try {
+    const slots = await api('/slots/available?limit=20');
+    const pick = prompt('New slot number:\n' + slots.map((s,i) => `${i+1}. ${s.label} · ${s.doctor_name}`).join('\n'));
+    const idx = parseInt(pick,10) - 1;
+    if (isNaN(idx) || !slots[idx]) return;
+    await api(`/appointments/${id}/reschedule`, {method:'POST', body:{new_slot_id: slots[idx].slot_id}});
+    toast('Rescheduled', 'ok'); load();
+  } catch (e) { toast(e.message, 'err'); }
+}
+</script>
+{% endblock %}

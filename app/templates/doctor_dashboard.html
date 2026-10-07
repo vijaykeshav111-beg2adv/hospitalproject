@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Doctor console{% endblock %}
+{% block content %}
+<div class="flex-between">
+  <h2 style="margin:0" id="title">Doctor console</h2>
+  <div class="row">
+    <select id="doctorPick" style="max-width:260px"></select>
+    <button class="btn ghost sm" onclick="load()">Refresh</button>
+    <a class="btn ghost sm" href="/ui/clinical">Clinical workspace</a>
+  </div>
+</div>
+<div class="grid g4" id="cards" style="margin-top:14px"></div>
+
+<div class="grid g2">
+  <div class="card">
+    <h3>Today's schedule</h3>
+    <div id="today" class="small muted">Loading…</div>
+  </div>
+  <div class="card">
+    <h3>Upcoming</h3>
+    <div id="upcoming" class="small muted">Loading…</div>
+  </div>
+</div>
+
+<div class="grid g2">
+  <div class="card">
+    <h3>Patient lookup</h3>
+    <div class="row"><input id="pq" placeholder="name / phone / patient ID"
+      onkeydown="if(event.key==='Enter')searchPatient()"/><button class="btn" onclick="searchPatient()">Search</button></div>
+    <div id="pResults" style="margin-top:10px" class="small"></div>
+  </div>
+  <div class="card">
+    <h3>Follow-ups due (7 days)</h3>
+    <div id="followUps" class="small muted">Loading…</div>
+    <h3 class="sub">My schedule &amp; leave</h3>
+    <div id="sched" class="small muted">Loading…</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let doctorId = null;
+if (guard()) init();
+
+async function init() {
+  try {
+    let me = null;
+    try { me = await api('/auth/me'); } catch(e) {}
+    const doctors = await api('/doctors?active_only=true');
+    const sel = document.getElementById('doctorPick');
+    sel.innerHTML = doctors.map(d => `<option value="${d.id}">${fmt.esc(d.full_name)} · ${fmt.esc(d.specialty_name||'')}</option>`).join('');
+    if (Auth.role() === 'DOCTOR') {
+      const mine = doctors.find(d => me && me.user && d.email === me.user.email);
+      doctorId = mine ? mine.id : (doctors[0] ? doctors[0].id : null);
+    } else {
+      doctorId = doctors.length ? doctors[0].id : null;
+    }
+    if (doctorId) sel.value = doctorId;
+    sel.onchange = () => { doctorId = +sel.value; load(); };
+    load();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function load() {
+  if (!doctorId) { toast('No doctors found', 'err'); return; }
+  try {
+    const d = await api('/admin/dashboard/doctor?doctor_id=' + doctorId);
+    const prof = await api('/doctors/' + doctorId);
+    document.getElementById('title').textContent = prof.full_name + ' · ' + (prof.specialty_name || '');
+    const c = d.cards;
+    document.getElementById('cards').innerHTML = [
+      `<div class="kpi"><div class="lbl">Today</div><div class="val">${c.today_appointments}</div>
+        <div class="hint">${c.today_patients} patients</div></div>`,
+      `<div class="kpi alt"><div class="lbl">Upcoming</div><div class="val">${c.upcoming_appointments}</div></div>`,
+      `<div class="kpi good"><div class="lbl">Completed today</div><div class="val">${c.completed_today}</div></div>`,
+      `<div class="kpi warn"><div class="lbl">Follow-ups pending</div><div class="val">${c.pending_follow_ups}</div></div>`,
+      `<div class="kpi"><div class="lbl">Seen this month</div><div class="val">${c.patients_seen_month}</div></div>`,
+      `<div class="kpi good"><div class="lbl">Revenue (month)</div><div class="val">${fmt.money(c.revenue_month)}</div></div>`,
+      `<div class="kpi alt"><div class="lbl">Rating</div><div class="val">${c.rating} ★</div></div>`,
+      `<div class="kpi"><div class="lbl">Fee</div><div class="val">₹${Number(prof.consultation_fee).toFixed(0)}</div>
+        <div class="hint">${prof.slot_duration_minutes} min slots</div></div>`,
+    ].join('');
+
+    const apptTable = rows => rows.length ? `<table><tbody>${rows.map(a => `
+      <tr><td><b>${a.time}</b><div class="muted small">token ${a.token ?? '-'}</div></td>
+      <td><b>${fmt.esc(a.patient_name)}</b><div class="muted small">${fmt.esc(a.patient_code||'')} · ${fmt.esc(a.phone||'')}</div>
+        <div class="muted small">${fmt.esc(a.reason||'')}</div></td>
+      <td>${badge(a.status)} ${badge(a.queue_status)}<div class="muted small">${a.source}</div></td>
+      <td class="right">
+        <button class="btn ghost sm" onclick="openPatient(${a.patient_id})">History</button>
+        ${a.queue_status === 'CHECKED_IN' ? `<button class="btn sm dark" onclick="queue('start-consultation',${a.id})">Start</button>` : ''}
+        ${a.queue_status === 'IN_CONSULTATION' ? `<button class="btn sm" onclick="queue('check-out',${a.id})">Finish</button>` : ''}
+        <a class="btn sm ghost" href="/ui/clinical?appointment=${a.id}">Consult</a>
+      </td></tr>`).join('')}</tbody></table>` : '<div class="muted">Nothing scheduled.</div>';
+    document.getElementById('today').innerHTML = apptTable(d.today_schedule);
+    document.getElementById('upcoming').innerHTML = apptTable(d.upcoming);
+
+    const fu = await api('/consultations/follow-ups/due?days=7&doctor_id=' + doctorId);
+    document.getElementById('followUps').innerHTML = fu.length ? `<table><tbody>${fu.map(f => `
+      <tr><td>${f.follow_up_date}</td><td><b>${fmt.esc(f.patient_name||'')}</b>
+        <div class="muted small">${fmt.esc(f.diagnosis||'')}</div></td>
+        <td class="right"><button class="btn ghost sm" onclick="openPatient(${f.patient_id})">Open</button></td></tr>`).join('')}
+      </tbody></table>` : '<div class="muted">No follow-ups due.</div>';
+
+    document.getElementById('sched').innerHTML = `
+      <div><b>Working days:</b> ${d.working_days.map(w => `${w.day.slice(0,3)} ${w.start}-${w.end}`).join(' · ') || '—'}</div>
+      <div style="margin-top:6px"><b>Leaves:</b> ${d.leaves.map(l => `${l.type} ${l.from}→${l.to}`).join(', ') || 'none'}</div>`;
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function queue(action, id) {
+  try { await api('/queue/' + action, {method:'POST', body:{appointment_id:id}});
+        toast(action.replace('-',' '), 'ok'); load(); } catch (e) { toast(e.message, 'err'); }
+}
+
+async function searchPatient() {
+  const q = document.getElementById('pq').value.trim();
+  const box = document.getElementById('pResults');
+  if (!q) return;
+  try {
+    const rows = await api('/patients/search/suggest?q=' + encodeURIComponent(q));
+    box.innerHTML = rows.length ? rows.map(r => `<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:6px 0">
+      <span><b>${fmt.esc(r.name)}</b> <span class="muted">${r.patient_code} · ${r.phone}</span></span>
+      <button class="btn ghost sm" onclick="openPatient(${r.id})">Open</button></div>`).join('')
+      : '<span class="muted">No matches.</span>';
+  } catch (e) { box.innerHTML = '<span class="badge bad">' + fmt.esc(e.message) + '</span>'; }
+}
+
+async function openPatient(patientId) {
+  try {
+    const [hist, files] = await Promise.all([
+      api('/patients/' + patientId + '/history'), api('/medical-files?patient_id=' + patientId)]);
+    const box = document.createElement('div');
+    box.className = 'modal';
+    box.innerHTML = `<div class="box">
+      <div class="flex-between"><h3 style="margin:0">${fmt.esc(hist.patient.name)} · ${hist.patient.code}</h3>
+        <button class="btn ghost sm" onclick="this.closest('.modal').remove()">Close</button></div>
+      <p class="small muted">${JSON.stringify(hist.stats)}</p>
+      <h4>Previous consultations</h4>
+      <div class="timeline">${hist.consultations.map(c => `<div class="t">
+        <b>${fmt.d(c.date)}</b> · ${fmt.esc(c.diagnosis || 'no diagnosis recorded')}
+        ${c.follow_up_date ? '<span class="badge warn">follow-up ' + c.follow_up_date + '</span>' : ''}</div>`).join('') || '<div class="muted">None</div>'}</div>
+      <h4>Appointments</h4>
+      <table><tbody>${hist.appointments.slice(0,8).map(a => `<tr><td>${a.date} ${a.time}</td>
+        <td>${fmt.esc(a.doctor||'')}</td><td>${badge(a.status)}</td></tr>`).join('')}</tbody></table>
+      <h4>Files (${files.length})</h4>
+      <div class="small">${files.map(f => `<a href="/api/v1/medical-files/${f.id}/download?token=${Auth.token()}"
+        target="_blank">${fmt.esc(f.title)}</a> <span class="muted">(${f.category})</span>`).join(' · ') || 'none'}</div>
+      <h4>Records</h4>
+      <div class="small">${hist.records.slice(0,10).map(r => `<div>${fmt.d(r.recorded_at)} · <b>${r.type}</b> · ${fmt.esc(r.title)}</div>`).join('')}</div>
+    </div>`;
+    document.body.appendChild(box);
+  } catch (e) { toast(e.message, 'err'); }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Super Admin dashboard{% endblock %}
+{% block content %}
+<div class="flex-between">
+  <div>
+    <h2 style="margin:0">Super Admin dashboard</h2>
+    <div class="small muted">Global hospital administration, security and system control.</div>
+  </div>
+  <button class="btn ghost sm" onclick="load()">Refresh</button>
+</div>
+
+<div class="grid g4" id="cards" style="margin-top:14px"></div>
+
+<div class="grid g2">
+  <div class="card">
+    <h3>Administration</h3>
+    <div class="row">
+      <a class="btn" href="/ui/admin">Hospital analytics</a>
+      <a class="btn ghost" href="/ui/security">Security &amp; audit</a>
+      <a class="btn ghost" href="/ui/system">System &amp; jobs</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Operations</h3>
+    <div class="row">
+      <a class="btn ghost" href="/ui/appointments">Appointments</a>
+      <a class="btn ghost" href="/ui/patients">Patients</a>
+      <a class="btn ghost" href="/ui/billing">Billing</a>
+      <a class="btn ghost" href="/ui/ai-monitor">AI monitor</a>
+    </div>
+  </div>
+</div>
+
+<div class="grid g2">
+  <div class="card">
+    <h3>System health</h3>
+    <div id="health" class="small muted">Loading…</div>
+  </div>
+  <div class="card">
+    <h3>Database tables</h3>
+    <div id="tables" class="small muted">Loading…</div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Security overview</h3>
+  <div id="security" class="small muted">Loading…</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+if (guard()) load();
+
+async function load() {
+  try {
+    const [health, system, security] = await Promise.all([
+      api('/admin/health'),
+      api('/admin/system'),
+      api('/admin/security/summary').catch(() => null)
+    ]);
+
+    document.getElementById('cards').innerHTML = [
+      `<div class="kpi"><div class="lbl">Service</div><div class="val">${fmt.esc(health.service || 'UP')}</div></div>`,
+      `<div class="kpi ${health.database && health.database.status === 'up' ? 'good' : 'bad'}">
+        <div class="lbl">Database</div><div class="val">${fmt.esc(health.database?.status || 'unknown')}</div></div>`,
+      `<div class="kpi"><div class="lbl">Backend</div><div class="val">${fmt.esc(health.database?.backend || 'MySQL')}</div></div>`,
+      `<div class="kpi alt"><div class="lbl">Tables</div><div class="val">${Object.keys(system.tables || {}).length}</div></div>`
+    ].join('');
+
+    document.getElementById('health').innerHTML =
+      `<div>Service: <span class="badge ok">${fmt.esc(health.service || 'UP')}</span></div>
+       <div>Database: <span class="badge ${health.database?.status === 'up' ? 'ok' : 'bad'}">${fmt.esc(health.database?.status || 'unknown')}</span></div>
+       <div class="muted">${fmt.esc(health.database?.database || health.database?.error || '')}</div>`;
+
+    document.getElementById('tables').innerHTML =
+      Object.entries(system.tables || {}).sort((a,b) => b[1] - a[1])
+        .map(([k,v]) =>
+          `<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line)">
+             <code>${fmt.esc(k)}</code><b>${fmt.n(v)}</b>
+           </div>`
+        ).join('') || '<span class="muted">No table data returned.</span>';
+
+    document.getElementById('security').innerHTML = security
+      ? `<pre style="white-space:pre-wrap">${fmt.esc(JSON.stringify(security, null, 2))}</pre>`
+      : `<span class="muted">Open Security &amp; audit for the complete audit, login, session and RBAC view.</span>`;
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+</script>
+{% endblock %}

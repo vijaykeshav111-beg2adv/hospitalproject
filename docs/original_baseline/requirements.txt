@@ -1,0 +1,10 @@
+pandas
+numpy
+scikit-learn
+fastapi 
+uvicorn 
+Jinja2
+python-multipart 
+gensim
+NLTK
+python-dotenv 

@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Admin dashboard{% endblock %}
+{% block content %}
+<div class="flex-between">
+  <h2 style="margin:0">Hospital dashboard</h2>
+  <div class="row">
+    <button class="pill on" data-days="7">7 d</button>
+    <button class="pill" data-days="30">30 d</button>
+    <button class="pill" data-days="90">90 d</button>
+    <button class="btn ghost sm" onclick="load()">Refresh</button>
+  </div>
+</div>
+<div class="grid g4" id="cards" style="margin-top:14px"></div>
+
+<div class="grid g2" style="margin-top:16px">
+  <div class="card"><h3>Appointments trend</h3><div id="chAppt"></div></div>
+  <div class="card"><h3>Revenue trend</h3><div id="chRev"></div></div>
+  <div class="card"><h3>Patient growth (cumulative)</h3><div id="chGrowth"></div></div>
+  <div class="card"><h3>Appointment mix</h3><div id="chMix"></div></div>
+  <div class="card"><h3>Popular specialties</h3><div id="chSpec"></div></div>
+  <div class="card"><h3>Doctor utilisation</h3><div id="chUtil"></div></div>
+</div>
+
+<div class="grid g2">
+  <div class="card">
+    <h3>AI front desk</h3>
+    <div id="aiCards" class="grid g3"></div>
+    <div class="row" style="margin-top:10px">
+      <a class="btn ghost sm" href="/ui/ai-monitor">Open AI monitor</a>
+      <a class="btn ghost sm" href="/ui/security">Security &amp; audit</a>
+      <a class="btn ghost sm" href="/ui/system">Jobs &amp; system</a>
+    </div>
+  </div>
+  <div class="card">
+    <h3>WhatsApp &amp; notifications</h3>
+    <div id="waCards" class="grid g3"></div>
+    <div class="row" style="margin-top:10px">
+      <a class="btn ghost sm" href="/ui/billing">Billing &amp; payments</a>
+      <a class="btn ghost sm" href="/ui/appointments">All appointments</a>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Today at a glance</h3>
+  <div id="todayTable" class="small muted">Loading…</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+if (guard()) {
+  let days = 30;
+  document.querySelectorAll('[data-days]').forEach(b => b.onclick = () => {
+    days = +b.dataset.days;
+    document.querySelectorAll('[data-days]').forEach(x => x.classList.toggle('on', x === b));
+    load();
+  });
+  load();
+}
+
+function kpi(label, value, hint='', cls='') {
+  return `<div class="kpi ${cls}"><div class="lbl">${label}</div><div class="val">${value}</div>
+    <div class="hint">${hint}</div></div>`;
+}
+
+async function load() {
+  try {
+    const d = await api('/admin/dashboard?days=' + days);
+    const c = d.cards;
+    document.getElementById('cards').innerHTML = [
+      kpi('Total patients', fmt.n(c.total_patients), c.new_patients_today + ' new today', ''),
+      kpi("Today's appointments", fmt.n(c.todays_appointments), c.upcoming_appointments + ' upcoming', 'alt'),
+      kpi('Revenue this month', fmt.money(c.revenue_month), fmt.money(c.revenue_today) + ' today', 'good'),
+      kpi('Pending payments', fmt.money(c.pending_payments), 'across unpaid invoices', 'warn'),
+      kpi('Doctors', fmt.n(c.doctors), 'active consultants', ''),
+      kpi('Cancelled', fmt.n(c.cancelled_appointments), c.cancellation_rate + '% of completed', 'bad'),
+      kpi('No-shows', fmt.n(c.no_shows), c.no_show_rate + '% of completed', 'bad'),
+      kpi('Slot utilisation', c.slot_utilisation + '%', 'booked vs open slots', 'alt'),
+      kpi('AI conversations', fmt.n(c.ai_conversations), c.ai_active_conversations + ' active', ''),
+      kpi('AI bookings', fmt.n(c.ai_bookings), c.ai_booking_rate + '% booking rate', 'good'),
+      kpi('AI escalations', fmt.n(c.ai_escalations_open), c.ai_failed_bookings + ' failed bookings', 'warn'),
+      kpi('Reviews', fmt.n(c.reviews_pending) + ' pending', 'avg ' + c.avg_rating + ' ★', ''),
+    ].join('');
+    document.getElementById('aiCards').innerHTML = [
+      kpi('Conversations', fmt.n(c.ai_conversations)),
+      kpi('Tool calls', fmt.n(c.ai_tool_calls)),
+      kpi('Avg response', c.ai_avg_response_ms + ' ms'),
+      kpi('Bookings', fmt.n(c.ai_bookings), 'via AI desk', 'good'),
+      kpi('Escalations', fmt.n(c.ai_escalations_open), 'open', 'warn'),
+      kpi('Errors', fmt.n(c.ai_errors), '', c.ai_errors ? 'bad' : ''),
+    ].join('');
+    document.getElementById('waCards').innerHTML = [
+      kpi('Messages', fmt.n(c.whatsapp_total)),
+      kpi('Delivered', fmt.n(c.whatsapp_sent)),
+      kpi('Delivery rate', c.whatsapp_delivery_rate + '%', '', 'good'),
+      kpi('Failed', fmt.n(c.whatsapp_failed), '', c.whatsapp_failed ? 'bad' : ''),
+      kpi('Completed visits', fmt.n(c.completed_appointments)),
+      kpi('New patients (month)', fmt.n(c.new_patients_month)),
+    ].join('');
+
+    const ch = d.charts;
+    svgLine(document.getElementById('chAppt'), ch.appointment_trend, {key:'count', color:'#12a08a'});
+    svgLine(document.getElementById('chRev'), ch.revenue_trend, {key:'revenue', color:'#0e7c6b'});
+    svgLine(document.getElementById('chGrowth'), ch.patient_growth, {key:'cumulative', color:'#f4a259'});
+    svgDonut(document.getElementById('chMix'), (ch.appointment_status_breakdown||[]).map(r => ({label:r.status, value:r.count})));
+    svgDonut(document.getElementById('chSpec'), (ch.popular_specialties||[]).map(r => ({label:r.specialty, value:r.appointments})));
+    svgBars(document.getElementById('chUtil'), (ch.doctor_utilisation||[]).map(r => ({date:r.doctor_name.split(' ')[1]||r.doctor_name,
+      count:r.utilisation_percent})), {key:'count', label:'date', color:'#5b8def'});
+    await loadToday();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function loadToday() {
+  const rows = await api('/appointments/today?limit=50');
+  const box = document.getElementById('todayTable');
+  if (!rows.length) { box.innerHTML = '<div class="muted">No appointments today.</div>'; return; }
+  box.innerHTML = `<table><thead><tr><th>Token</th><th>Patient</th><th>Doctor</th><th>Time</th>
+    <th>Source</th><th>Status</th><th>Queue</th></tr></thead><tbody>` + rows.map(a => `
+    <tr><td>${a.token_number ?? '-'}</td>
+      <td><b>${fmt.esc(a.patient_name)}</b><div class="muted small">${a.patient_code || ''}</div></td>
+      <td>${fmt.esc(a.doctor_name)}<div class="muted small">${fmt.esc(a.specialty_name || '')}</div></td>
+      <td>${a.start_time}</td><td><span class="badge mute">${a.source}</span></td>
+      <td>${badge(a.status)}</td><td>${badge(a.queue_status)}</td></tr>`).join('') + '</tbody></table>';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}AI monitor{% endblock %}
+{% block content %}
+<div class="flex-between">
+  <h2 style="margin:0">AI monitor</h2>
+  <div class="row">
+    <button class="btn ghost sm" onclick="load()">Refresh</button>
+    <a class="btn ghost sm" href="/ui/ai-chat">Open assistant</a>
+  </div>
+</div>
+<div class="grid g4" id="cards" style="margin-top:14px"></div>
+
+<div class="grid g2">
+  <div class="card"><h3>Conversations</h3><div id="conv" class="small muted">Loading…</div></div>
+  <div class="card"><h3>Response time trend (ms)</h3><div id="chResp"></div>
+    <h3 class="sub">Tool usage</h3><div id="tools" class="small"></div></div>
+</div>
+
+<div class="grid g2">
+  <div class="card"><h3>Escalations</h3><div id="esc" class="small muted">Loading…</div></div>
+  <div class="card"><h3>Routing log</h3><div id="routing" class="small muted">Loading…</div></div>
+</div>
+
+<div class="card">
+  <h3>Failures &amp; errors</h3>
+  <div id="errors" class="small muted">Loading…</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+if (guard()) load();
+
+async function load() {
+  try {
+    const m = await api('/ai/monitor?days=30');
+    const c = m.cards;
+    document.getElementById('cards').innerHTML = [
+      `<div class="kpi"><div class="lbl">Conversations</div><div class="val">${c.conversations}</div>
+        <div class="hint">${c.active} active · ${c.escalated} escalated</div></div>`,
+      `<div class="kpi"><div class="lbl">Booking attempts</div><div class="val">${c.booking_attempts}</div>
+        <div class="hint">${c.successful_bookings} booked · ${c.failed_bookings} failed</div></div>`,
+      `<div class="kpi good"><div class="lbl">Success rate</div>
+        <div class="val">${c.booking_attempts ? Math.round(100*c.successful_bookings/c.booking_attempts) : 0}%</div></div>`,
+      `<div class="kpi warn"><div class="lbl">Escalations</div><div class="val">${c.escalation_count}</div></div>`,
+      `<div class="kpi"><div class="lbl">Tool calls</div><div class="val">${c.tool_calls}</div></div>`,
+      `<div class="kpi alt"><div class="lbl">Avg response</div><div class="val">${c.avg_response_ms} ms</div></div>`,
+    ].join('');
+
+    svgBars(document.getElementById('chResp'), (m.response_time_trend||[]).map(r => ({date:r.date, count:r.avg_ms})),
+      {key:'count', label:'date', color:'#0e7c6b'});
+
+    document.getElementById('conv').innerHTML = (m.conversations||[]).length ?
+      `<table><thead><tr><th>Patient</th><th>Intent</th><th>Stage</th><th>Msgs</th><th>Booked</th><th>Esc</th>
+        <th class="right">Action</th></tr></thead><tbody>${m.conversations.map(x => `
+        <tr><td>${fmt.esc(x.patient)}<div class="muted small">${fmt.dt(x.started_at)}</div></td>
+        <td>${fmt.esc(x.intent||'—')}</td><td>${badge(x.status)}<div class="muted small">${fmt.esc(x.stage||'')}</div></td>
+        <td>${x.messages}<div class="muted small">${x.tools} tools</div></td>
+        <td>${x.bookings}/${x.bookings + x.failed}</td><td>${x.escalations}</td>
+        <td class="right"><button class="btn ghost sm" onclick="openConv(${x.id})">Inspect</button></td></tr>`).join('')}
+        </tbody></table>` : '<span class="muted">No conversations yet.</span>';
+
+    const tools = {};
+    (m.tool_usage||[]).forEach(t => { tools[t.tool] = (tools[t.tool]||0) + t.count; });
+    document.getElementById('tools').innerHTML = Object.entries(tools).sort((a,b)=>b[1]-a[1]).map(([k,v]) =>
+      `<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:4px 0">
+        <code>${k}()</code><b>${v}</b></div>`).join('') || '<span class="muted">No tool calls.</span>';
+
+    document.getElementById('esc').innerHTML = (m.escalations||[]).length ? m.escalations.map(e => `
+      <div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:6px 0">
+        <span><span class="badge ${e.level === 'EMERGENCY' ? 'bad' : 'warn'}">${e.level}</span>
+          ${fmt.esc(e.reason)}<div class="muted">conv #${e.conversation_id} · ${fmt.dt(e.created_at)}</div></span>
+        <span>${badge(e.status)} ${e.status === 'OPEN' ? `<button class="btn ghost sm"
+          onclick="resolve(${e.id})">Resolve</button>` : ''}</span></div>`).join('')
+      : '<span class="muted">No escalations. </span>';
+
+    const routing = await api('/ai/monitor/routing?limit=25');
+    document.getElementById('routing').innerHTML = routing.length ? routing.map(r => `
+      <div style="border-bottom:1px solid var(--line);padding:6px 0">
+        <b>${fmt.esc(r.decision)}</b>
+        <div class="muted">score ${r.match_score ?? '—'} · conv #${r.conversation_id} · ${fmt.dt(r.at)}</div></div>`).join('')
+      : '<span class="muted">No routing decisions logged.</span>';
+
+    const fails = await api('/ai/monitor/failures?limit=25');
+    document.getElementById('errors').innerHTML = fails.failed_tool_calls.length || fails.conversations_with_errors.length ?
+      `<table><thead><tr><th>Tool</th><th>Error</th><th>Conversation</th><th>When</th></tr></thead><tbody>
+        ${fails.failed_tool_calls.map(f => `<tr><td><code>${f.tool}()</code></td><td>${fmt.esc(f.error)}</td>
+          <td>#${f.conversation_id}</td><td>${fmt.dt(f.at)}</td></tr>`).join('')}</tbody></table>`
+      : '<span class="muted">No failures recorded — the assistant is running clean.</span>';
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function resolve(id) {
+  try { await api('/ai/escalations/' + id + '/resolve?notes=handled+from+monitor', {method:'POST'});
+        toast('Escalation resolved', 'ok'); load(); } catch (e) { toast(e.message, 'err'); }
+}
+
+async function openConv(id) {
+  try {
+    const d = await api('/ai/conversations/' + id);
+    const box = document.createElement('div'); box.className = 'modal';
+    box.innerHTML = `<div class="box">
+      <div class="flex-between"><h3 style="margin:0">Conversation #${id}</h3>
+        <button class="btn ghost sm" onclick="this.closest('.modal').remove()">Close</button></div>
+      <p class="small muted">stage ${d.conversation.stage} · intent ${d.conversation.primary_intent} ·
+        ${d.conversation.message_count} messages · summary: ${fmt.esc(d.conversation.summary||'—')}</p>
+      <div class="chat" style="max-height:40vh">${d.messages.map(m =>
+        `<div class="msg ${m.role === 'user' ? 'user' : 'bot'}">${fmt.esc(m.content)}
+          <div class="small" style="opacity:.75">${m.intent||''} ${m.tool_calls ? '· tools: ' + m.tool_calls.join(', ') : ''}
+          ${m.safety_flag ? '· ⚠ ' + m.safety_flag : ''}</div></div>`).join('')}</div>
+      <h4>Tool calls</h4>
+      <table><thead><tr><th>Tool</th><th>Args</th><th>Status</th><th>ms</th></tr></thead><tbody>
+        ${(d.tool_calls||[]).map(t => `<tr><td><code>${t.tool}</code></td>
+          <td class="small">${fmt.esc(JSON.stringify(t.arguments))}</td><td>${badge(t.status)}</td>
+          <td>${t.duration_ms}</td></tr>`).join('')}</tbody></table>
+      <h4>Concerns</h4>
+      <div class="small">${(d.concerns||[]).map(c => `<div>${fmt.esc(c.text)} — urgency ${c.urgency},
+        status ${c.status}</div>`).join('') || 'none'}</div>
+    </div>`;
+    document.body.appendChild(box);
+  } catch (e) { toast(e.message, 'err'); }
+}
+</script>
+{% endblock %}

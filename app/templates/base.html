@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<title>{% block title %}{{ app_name }}{% endblock %} | {{ app_name }}</title>
+<style>
+:root{
+  --bg:#f4f7f6; --panel:#ffffff; --panel-2:#fbfdfc; --ink:#12211f; --muted:#607875;
+  --brand:#0e7c6b; --brand-2:#12a08a; --brand-soft:#e6f4f1; --accent:#f4a259;
+  --danger:#d64545; --warn:#d99414; --ok:#1f9d55; --line:#e2ebe8;
+  --shadow:0 1px 2px rgba(16,40,36,.06),0 8px 24px rgba(16,40,36,.06);
+  --radius:14px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;font-size:15px;line-height:1.5}
+a{color:var(--brand);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:1240px;margin:0 auto;padding:0 18px}
+header.top{background:linear-gradient(120deg,#0b5f52,#0e7c6b 55%,#12a08a);color:#fff;
+  box-shadow:var(--shadow);position:sticky;top:0;z-index:20}
+.top .bar{display:flex;align-items:center;gap:14px;padding:12px 0;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:11px;font-weight:700;letter-spacing:.2px}
+.brand .logo{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,.16);
+  display:grid;place-items:center;font-size:19px;border:1px solid rgba(255,255,255,.25)}
+.brand small{display:block;font-weight:400;font-size:11.5px;opacity:.85;letter-spacing:.4px}
+nav.menu{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
+nav.menu a{color:#eafaf6;padding:8px 11px;border-radius:9px;font-size:13.5px;font-weight:600}
+nav.menu a:hover,nav.menu a.on{background:rgba(255,255,255,.16);text-decoration:none}
+.who{display:flex;align-items:center;gap:8px;font-size:12.5px;background:rgba(255,255,255,.13);
+  padding:6px 10px;border-radius:999px}
+.dot{width:8px;height:8px;border-radius:50%;background:#8ef0c9}
+main{padding:22px 0 60px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);
+  padding:18px;margin-bottom:16px}
+.card h2,.card h3{margin:0 0 12px;font-size:17px;letter-spacing:.1px}
+.card h3.sub{margin-top:18px}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 15px;
+  box-shadow:var(--shadow);position:relative;overflow:hidden}
+.kpi:before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--brand-2)}
+.kpi .lbl{font-size:11.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:700}
+.kpi .val{font-size:24px;font-weight:800;margin-top:5px}
+.kpi .hint{font-size:12px;color:var(--muted);margin-top:3px}
+.kpi.warn:before{background:var(--warn)} .kpi.bad:before{background:var(--danger)}
+.kpi.good:before{background:var(--ok)} .kpi.alt:before{background:var(--accent)}
+table{width:100%;border-collapse:collapse;font-size:13.6px}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);background:var(--panel-2)}
+tbody tr:hover{background:#f6fbfa}
+input,select,textarea{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:10px;
+  font:inherit;background:#fff;color:var(--ink)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--brand-soft);border-color:var(--brand-2)}
+label{display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin:10px 0 4px;
+  text-transform:uppercase;letter-spacing:.4px}
+.btn{display:inline-flex;align-items:center;gap:7px;background:var(--brand);color:#fff;border:0;
+  padding:10px 15px;border-radius:10px;font-weight:700;font-size:13.6px;cursor:pointer;transition:.15s}
+.btn:hover{background:#0b6b5c}
+.btn.ghost{background:var(--brand-soft);color:var(--brand)}
+.btn.ghost:hover{background:#d6ece7}
+.btn.warn{background:var(--warn)} .btn.bad{background:var(--danger)} .btn.dark{background:#22343a}
+.btn.sm{padding:6px 10px;font-size:12.5px}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:800;
+  letter-spacing:.3px;background:#eef3f2;color:#40605c}
+.badge.ok{background:#e3f7ec;color:#14663a} .badge.warn{background:#fdf1dc;color:#8a5b0a}
+.badge.bad{background:#fdeaea;color:#952323} .badge.info{background:var(--brand-soft);color:#0a5b4f}
+.badge.mute{background:#eef1f1;color:#6a7b78}
+.muted{color:var(--muted)} .small{font-size:12.5px} .right{text-align:right} .center{text-align:center}
+.pill{padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:12.5px}
+.pill.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.chat{display:flex;flex-direction:column;gap:10px;max-height:60vh;overflow:auto;padding:6px 2px}
+.msg{max-width:78%;padding:11px 13px;border-radius:14px;white-space:pre-wrap;font-size:14px}
+.msg.user{align-self:flex-end;background:var(--brand);color:#fff;border-bottom-right-radius:4px}
+.msg.bot{align-self:flex-start;background:#f2f7f6;border:1px solid var(--line);border-bottom-left-radius:4px}
+.msg.sys{align-self:center;background:#fff7e8;border:1px dashed var(--warn);font-size:12.5px;color:#7a5406}
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+.chip{background:var(--brand-soft);color:#0a5b4f;border:1px solid #cfe7e2;border-radius:999px;
+  padding:6px 12px;cursor:pointer;font-size:12.6px;font-weight:600}
+.chip:hover{background:#d6ece7}
+.timeline{border-left:2px solid var(--line);margin-left:8px;padding-left:16px}
+.timeline .t{position:relative;padding:0 0 14px}
+.timeline .t:before{content:"";position:absolute;left:-23px;top:5px;width:9px;height:9px;border-radius:50%;
+  background:var(--brand-2);box-shadow:0 0 0 3px #e6f4f1}
+.tabs{display:flex;gap:5px;border-bottom:1px solid var(--line);margin-bottom:14px;flex-wrap:wrap}
+.tabs button{background:none;border:0;padding:10px 12px;font:inherit;font-weight:700;color:var(--muted);
+  cursor:pointer;border-bottom:3px solid transparent}
+.tabs button.on{color:var(--brand);border-color:var(--brand)}
+.hide{display:none!important}
+.toast{position:fixed;right:16px;bottom:16px;z-index:60;display:flex;flex-direction:column;gap:8px}
+.toast div{background:#12211f;color:#fff;padding:11px 14px;border-radius:11px;font-size:13.4px;
+  box-shadow:var(--shadow);max-width:340px}
+.toast div.ok{background:#14663a} .toast div.err{background:#952323} .toast div.warn{background:#8a5b0a}
+.hero{background:radial-gradient(1000px 400px at 12% -10%,#12a08a33,transparent),
+  linear-gradient(135deg,#0b5f52,#0e7c6b);color:#fff;border-radius:20px;padding:34px;box-shadow:var(--shadow)}
+.hero h1{margin:0 0 10px;font-size:32px;line-height:1.2}
+.hero p{margin:0;opacity:.92;max-width:720px}
+.hero .cta{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+.hero .btn{background:#fff;color:#0b5f52} .hero .btn.ghost{background:rgba(255,255,255,.16);color:#fff}
+.statline{display:flex;gap:26px;margin-top:22px;flex-wrap:wrap}
+.statline div span{display:block;font-size:24px;font-weight:800}
+.chart{width:100%;height:190px}
+footer{border-top:1px solid var(--line);padding:18px 0 34px;color:var(--muted);font-size:12.6px}
+.flex-between{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.modal{position:fixed;inset:0;background:rgba(10,25,23,.5);display:grid;place-items:center;z-index:50;padding:16px}
+.modal .box{background:#fff;border-radius:16px;padding:20px;max-width:560px;width:100%;max-height:86vh;overflow:auto}
+@media(max-width:720px){.hero{padding:22px}.hero h1{font-size:25px}nav.menu{width:100%;margin-left:0}}
+</style>
+{% block head %}{% endblock %}
+</head>
+<body>
+<header class="top">
+  <div class="wrap bar">
+    <a href="/ui" class="brand" style="color:#fff;text-decoration:none">
+      <span class="logo">✚</span>
+      <span>Vijay Vargiya Group of Hospitals
+        <small>Multi-speciality hospital &middot; Jaipur</small>
+      </span>
+    </a>
+    <nav class="menu" id="nav"></nav>
+    <div class="who" id="whoami" style="display:none">
+      <span class="dot"></span><span id="whoName">-</span><span id="whoRole" class="muted"></span>
+      <a href="#" id="logoutLink" style="color:#fff;font-weight:700">Logout</a>
+    </div>
+  </div>
+</header>
+<main class="wrap">
+{% block content %}{% endblock %}
+</main>
+<footer class="wrap">
+  <div class="flex-between">
+    <span>&copy; {{ app_name }} &middot; FastAPI + MySQL hospital management platform</span>
+    <span><a href="/docs">API docs</a> &middot; <a href="/ui/ai-chat">AI assistant</a> &middot; env: {{ env }}</span>
+  </div>
+</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ------------------------------------------------------------------ *
+ * tiny client: localStorage wrapper (sandbox-safe), API helper, UI kit
+ * ------------------------------------------------------------------ */
+const Store = (() => {
+  let mem = {};
+  let ok = true;
+  try { window.localStorage.setItem('__t','1'); window.localStorage.removeItem('__t'); }
+  catch (e) { ok = false; }
+  return {
+    get: k => ok ? window.localStorage.getItem(k) : (mem[k] ?? null),
+    set: (k,v) => { ok ? window.localStorage.setItem(k,v) : (mem[k]=v); },
+    del: k => { ok ? window.localStorage.removeItem(k) : delete mem[k]; }
+  };
+})();
+
+const Auth = {
+  token: () => Store.get('vvh_token'),
+  refreshToken: () => Store.get('vvh_refresh'),
+  user: () => { try { return JSON.parse(Store.get('vvh_user') || 'null'); } catch(e){ return null; } },
+  perms: () => { try { return JSON.parse(Store.get('vvh_perms') || '[]'); } catch(e){ return []; } },
+  save(data){
+    Store.set('vvh_token', data.access_token);
+    if (data.refresh_token) Store.set('vvh_refresh', data.refresh_token);
+    if (data.user) Store.set('vvh_user', JSON.stringify(data.user));
+    if (data.permissions) Store.set('vvh_perms', JSON.stringify(data.permissions));
+  },
+  clear(){ ['vvh_token','vvh_refresh','vvh_user','vvh_perms'].forEach(k => Store.del(k)); },
+  has(p){ const u = Auth.user(); return u && u.role_name === 'SUPER_ADMIN' ? true : Auth.perms().includes(p); },
+  role(){ const u = Auth.user(); return u ? u.role_name : null; }
+};
+
+function toast(msg, kind='') {
+  const box = document.getElementById('toast');
+  const el = document.createElement('div');
+  el.className = kind; el.textContent = msg;
+  box.appendChild(el);
+  setTimeout(() => el.remove(), 5200);
+}
+
+async function api(path, {method='GET', body=null, form=null, raw=false} = {}) {
+  const headers = {};
+  if (Auth.token()) headers['Authorization'] = 'Bearer ' + Auth.token();
+  let payload;
+  if (form) { payload = form; }
+  else if (body !== null) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+
+  let res = await fetch('/api/v1' + path, {method, headers, body: payload});
+  if (res.status === 401 && Auth.refreshToken() && !path.startsWith('/auth/')) {
+    const r = await fetch('/api/v1/auth/refresh', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({refresh_token: Auth.refreshToken()})});
+    if (r.ok) { Auth.save(await r.json()); return api(path, {method, body, form}); }
+    Auth.clear();
+  }
+  if (raw) return res;
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch(e) { data = {detail:text}; }
+  if (!res.ok) {
+    const detail = (data && (data.detail?.length ? data.detail : data.detail)) || res.statusText;
+    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+  }
+  return data;
+}
+
+function guard(...roles) {
+  if (!Auth.token()) { location.href = '/ui/login?next=' + encodeURIComponent(location.pathname); return false; }
+  if (roles.length && !roles.includes(Auth.role()) && Auth.role() !== 'SUPER_ADMIN') {
+    toast('Your role cannot open this page', 'err'); setTimeout(()=>location.href='/ui', 900); return false;
+  }
+  return true;
+}
+
+const NAV = [
+  {href:'/ui/super-admin',   label:'Super Admin', perms:['admin:*']},
+  {href:'/ui/admin',        label:'Admin',      perms:['dashboard:admin']},
+  {href:'/ui/reception',    label:'Reception',  perms:['dashboard:reception']},
+  {href:'/ui/doctor',       label:'Doctor',     perms:['dashboard:doctor']},
+  {href:'/ui/patient',      label:'My health',  perms:['dashboard:patient']},
+  {href:'/ui/appointments', label:'Appointments'},
+  {href:'/ui/patients',     label:'Patients',   perms:['patients:read']},
+  {href:'/ui/clinical',     label:'Clinical',   perms:['records:read','consultations:read']},
+  {href:'/ui/billing',      label:'Billing',    perms:['invoices:read']},
+  {href:'/ui/ai-chat',      label:'AI assistant'},
+  {href:'/ui/ai-monitor',   label:'AI monitor', perms:['ai:admin']},
+  {href:'/ui/security',     label:'Security',   perms:['audit:read','session:manage']},
+  {href:'/ui/system',       label:'System',     perms:['settings:manage']},
+];
+
+async function mountChrome() {
+  const nav = document.getElementById('nav');
+  const me = Auth.user();
+  NAV.forEach(item => {
+    if (item.perms && !item.perms.some(p => Auth.has(p))) return;
+    const a = document.createElement('a');
+    a.href = item.href; a.textContent = item.label;
+    if (location.pathname === item.href) a.className = 'on';
+    nav.appendChild(a);
+  });
+  if (!Auth.token()) {
+    nav.innerHTML = '<a href="/ui/login">Login</a><a href="/ui/register">Register</a>';
+    return;
+  }
+  document.getElementById('whoami').style.display = 'flex';
+  document.getElementById('whoName').textContent = me ? me.full_name : 'Signed in';
+  document.getElementById('whoRole').textContent = me ? '· ' + me.role_name : '';
+  document.getElementById('logoutLink').onclick = async (e) => {
+    e.preventDefault();
+    try { await api('/auth/logout', {method:'POST'}); } catch(err) {}
+    Auth.clear(); location.href = '/ui/login';
+  };
+}
+
+/* ---------------------- dependency-free charts ---------------------- */
+function svgBars(el, data, {key='count', label='date', height=190, color='#12a08a'} = {}) {
+  const w = el.clientWidth || 600, h = height, pad = 28;
+  const max = Math.max(1, ...data.map(d => d[key]));
+  const bw = data.length ? (w - pad*2) / data.length : 10;
+  let bars = '', labels = '';
+  data.forEach((d,i) => {
+    const v = d[key], bh = (h - pad*2) * (v / max);
+    const x = pad + i*bw, y = h - pad - bh;
+    bars += `<rect x="${x+1}" y="${y}" width="${Math.max(2,bw-3)}" height="${bh}" rx="2" fill="${color}" opacity="0.85"><title>${d[label]}: ${v}</title></rect>`;
+    if (data.length <= 16 || i % Math.ceil(data.length/12) === 0)
+      labels += `<text x="${x+bw/2}" y="${h-9}" font-size="9" fill="#607875" text-anchor="middle">${String(d[label]).slice(5)}</text>`;
+  });
+  el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" class="chart" preserveAspectRatio="none">
+    <line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" stroke="#e2ebe8"/>
+    ${bars}${labels}
+    <text x="${pad}" y="14" font-size="10" fill="#607875">max ${max}</text></svg>`;
+}
+
+function svgLine(el, data, {key='count', label='date', height=190, color='#0e7c6b'} = {}) {
+  const w = el.clientWidth || 600, h = height, pad = 30;
+  const max = Math.max(1, ...data.map(d => d[key]));
+  const step = data.length > 1 ? (w - pad*2) / (data.length - 1) : 0;
+  const pts = data.map((d,i) => [pad + i*step, h - pad - (h - pad*2) * (d[key] / max)]);
+  const path = pts.map((p,i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  const area = path + ` L ${pad + (data.length-1)*step} ${h-pad} L ${pad} ${h-pad} Z`;
+  el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" class="chart" preserveAspectRatio="none">
+    <path d="${area}" fill="${color}" opacity="0.12"/>
+    <path d="${path}" fill="none" stroke="${color}" stroke-width="2.4"/>
+    <line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" stroke="#e2ebe8"/>
+    ${data.length?`<text x="${pad}" y="14" font-size="10" fill="#607875">${data[0][label]} → ${data[data.length-1][label]}</text>`:''}
+    <text x="${pad}" y="${h-9}" font-size="10" fill="#607875">max ${max}</text></svg>`;
+}
+
+function svgDonut(el, entries, size=170) {
+  const total = entries.reduce((a,e)=>a+e.value,0) || 1;
+  const colors = ['#0e7c6b','#12a08a','#f4a259','#d99414','#d64545','#5b8def','#8e6bd8','#1f9d55'];
+  let start = -Math.PI/2, arcs = '';
+  entries.forEach((e,i) => {
+    const ang = (e.value/total) * Math.PI*2, end = start + ang, r = size/2 - 10;
+    const x1 = size/2 + r*Math.cos(start), y1 = size/2 + r*Math.sin(start);
+    const x2 = size/2 + r*Math.cos(end),   y2 = size/2 + r*Math.sin(end);
+    const large = ang > Math.PI ? 1 : 0;
+    arcs += `<path d="M ${size/2} ${size/2} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z"
+      fill="${colors[i%colors.length]}" opacity="0.9"><title>${e.label}: ${e.value}</title></path>`;
+    start = end;
+  });
+  const legend = entries.map((e,i)=>`<div class="small"><span style="display:inline-block;width:9px;height:9px;
+    border-radius:2px;background:${colors[i%colors.length]};margin-right:6px"></span>${e.label}
+    <b>${e.value}</b></div>`).join('');
+  el.innerHTML = `<div class="row" style="align-items:center;gap:18px">
+      <svg width="${size}" height="${size}">${arcs}<circle cx="${size/2}" cy="${size/2}" r="${size/2-34}" fill="#fff"/>
+      <text x="${size/2}" y="${size/2+4}" text-anchor="middle" font-size="16" font-weight="700">${total}</text></svg>
+      <div style="display:flex;flex-direction:column;gap:4px">${legend}</div></div>`;
+}
+
+const fmt = {
+  dt: s => s ? new Date(s).toLocaleString('en-IN', {dateStyle:'medium', timeStyle:'short'}) : '-',
+  d: s => s ? new Date(s).toLocaleDateString('en-IN', {dateStyle:'medium'}) : '-',
+  money: n => '₹' + Number(n || 0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}),
+  n: n => Number(n || 0).toLocaleString('en-IN'),
+  esc: s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),
+};
+
+function badge(status) {
+  const s = String(status || '').toUpperCase();
+  const map = {CONFIRMED:'ok',COMPLETED:'ok',PAID:'ok',APPROVED:'ok',SENT:'ok',DELIVERED:'ok',AVAILABLE:'ok',
+    PENDING:'warn',PARTIAL:'warn',HELD:'warn',WAITING:'warn',CHECKED_IN:'info',IN_CONSULTATION:'info',
+    CANCELLED:'bad',NO_SHOW:'bad',FAILED:'bad',REJECTED:'bad',BLOCKED:'mute',REFUNDED:'warn',BOOKED:'info',
+    REQUESTED:'warn',OPEN:'warn',RESOLVED:'ok',ACTIVE:'ok',CLOSED:'mute',ESCALATED:'bad'};
+  return `<span class="badge ${map[s] || 'mute'}">${fmt.esc(s.replace(/_/g,' '))}</span>`;
+}
+
+document.addEventListener('DOMContentLoaded', mountChrome);
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Reception desk{% endblock %}
+{% block content %}
+<div class="flex-between">
+  <h2 style="margin:0">Reception desk</h2>
+  <div class="row">
+    <a class="btn" href="/ui/patients">Register patient</a>
+    <a class="btn ghost" href="/ui/book">Book appointment</a>
+    <button class="btn ghost sm" onclick="load()">Refresh</button>
+  </div>
+</div>
+<div class="grid g4" id="cards" style="margin-top:14px"></div>
+
+<div class="card">
+  <div class="tabs">
+    <button class="on" data-f="ALL">All today</button>
+    <button data-f="WAITING">Waiting</button>
+    <button data-f="CHECKED_IN">Checked-in</button>
+    <button data-f="IN_CONSULTATION">In consultation</button>
+    <button data-f="COMPLETED">Completed</button>
+    <button data-f="NO_SHOW">No-shows</button>
+  </div>
+  <table>
+    <thead><tr><th>Token</th><th>Patient</th><th>Doctor</th><th>Time</th><th>Waiting</th>
+      <th>Status</th><th>Invoice</th><th class="right">Actions</th></tr></thead>
+    <tbody id="queueRows"><tr><td colspan="8" class="muted">Loading…</td></tr></tbody>
+  </table>
+</div>
+
+<div class="grid g2">
+  <div class="card"><h3>Doctor availability today</h3><div id="docs" class="small muted">Loading…</div></div>
+  <div class="card">
+    <h3>Quick collect payment</h3>
+    <div class="row">
+      <input id="invId" placeholder="Invoice ID" style="max-width:130px"/>
+      <input id="payAmt" placeholder="Amount" style="max-width:130px"/>
+      <select id="payMethod" style="max-width:140px">
+        <option>CASH</option><option>UPI</option><option>CARD</option><option>ONLINE</option></select>
+      <button class="btn" onclick="collect()">Collect</button>
+    </div>
+    <div id="payMsg" class="small" style="margin-top:10px"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let filter = 'ALL', desk = null;
+if (guard()) load();
+
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  filter = b.dataset.f;
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+  render();
+});
+
+async function load() {
+  try {
+    desk = await api('/queue/desk');
+    const c = desk.cards;
+    document.getElementById('cards').innerHTML = [
+      `<div class="kpi"><div class="lbl">Today total</div><div class="val">${c.today_total}</div></div>`,
+      `<div class="kpi alt"><div class="lbl">Waiting</div><div class="val">${c.waiting}</div></div>`,
+      `<div class="kpi warn"><div class="lbl">Checked in</div><div class="val">${c.checked_in}</div></div>`,
+      `<div class="kpi"><div class="lbl">In consultation</div><div class="val">${c.in_consultation}</div></div>`,
+      `<div class="kpi good"><div class="lbl">Completed</div><div class="val">${c.completed}</div></div>`,
+      `<div class="kpi bad"><div class="lbl">No-shows</div><div class="val">${c.no_show}</div></div>`,
+      `<div class="kpi good"><div class="lbl">Collected today</div><div class="val">${fmt.money(c.collected_today)}</div></div>`,
+      `<div class="kpi warn"><div class="lbl">Pending payments</div><div class="val">${fmt.money(c.pending_payments)}</div></div>`,
+    ].join('');
+    document.getElementById('docs').innerHTML = '<table><tbody>' + desk.doctor_availability_today.map(d => `
+      <tr><td><b>${fmt.esc(d.name)}</b><div class="muted small">${fmt.esc(d.specialty||'')}</div></td>
+        <td>${d.on_leave ? '<span class="badge bad">on leave</span>' :
+             (d.working ? '<span class="badge ok">working</span>' : '<span class="badge mute">off</span>')}
+          <div class="muted small">${(d.hours||[]).join(', ') || '—'}</div></td>
+        <td class="right"><b>${d.free_slots_today}</b><div class="muted small">free slots</div></td></tr>`).join('') +
+      '</tbody></table>';
+    render();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+function render() {
+  const rows = (desk?.queue || []).filter(a => filter === 'ALL' || a.queue_status === filter);
+  const tb = document.getElementById('queueRows');
+  if (!rows.length) { tb.innerHTML = '<tr><td colspan="8" class="muted">Nothing here.</td></tr>'; return; }
+  tb.innerHTML = rows.map(a => `
+    <tr>
+      <td><b>${a.token_number ?? '-'}</b></td>
+      <td><b>${fmt.esc(a.patient_name)}</b><div class="muted small">${fmt.esc(a.phone || '')}</div></td>
+      <td>${fmt.esc(a.doctor_name)}</td>
+      <td>${a.time}<div class="muted small">${a.date}</div></td>
+      <td>${a.waiting_minutes !== null && a.waiting_minutes !== undefined ? a.waiting_minutes + ' min' : '—'}</td>
+      <td>${badge(a.queue_status)}<div class="muted small">${a.status}</div></td>
+      <td>${a.invoice_id ? `<a href="/ui/billing?invoice=${a.invoice_id}">#${a.invoice_id}</a>` : '—'}</td>
+      <td class="right">
+        ${a.queue_status === 'WAITING' ? `<button class="btn sm" onclick="act('check-in',${a.id})">Check in</button>` : ''}
+        ${a.queue_status === 'CHECKED_IN' ? `<button class="btn sm dark" onclick="act('start-consultation',${a.id})">Start</button>` : ''}
+        ${a.queue_status === 'IN_CONSULTATION' ? `<button class="btn sm ghost" onclick="act('check-out',${a.id})">Check out</button>` : ''}
+        ${['WAITING','CHECKED_IN'].includes(a.queue_status) ? `<button class="btn sm bad" onclick="act('no-show',${a.id})">No-show</button>` : ''}
+      </td>
+    </tr>`).join('');
+}
+
+async function act(action, id) {
+  try {
+    const r = await api('/queue/' + action, {method:'POST', body:{appointment_id:id}});
+    toast(action.replace('-', ' ') + ' · ' + (r.patient_name || ''), 'ok');
+    load();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function collect() {
+  const msg = document.getElementById('payMsg');
+  try {
+    const invId = document.getElementById('invId').value.trim();
+    const p = await api('/payments', {method:'POST', body:{
+      invoice_id: invId ? +invId : null, amount: parseFloat(document.getElementById('payAmt').value || '0'),
+      method: document.getElementById('payMethod').value, status:'PAID', notify_patient:true}});
+    msg.innerHTML = '<span class="badge ok">Collected ' + fmt.money(p.amount) + ' · ' + p.payment_code + '</span>';
+    load();
+  } catch (e) { msg.innerHTML = '<span class="badge bad">' + fmt.esc(e.message) + '</span>'; }
+}
+</script>
+{% endblock %}

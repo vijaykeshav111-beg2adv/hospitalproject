@@ -1,0 +1,37 @@
+{
+  "python.terminal.activateEnvironment": true,
+  "python.analysis.extraPaths": ["."],
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/.pytest_cache": true,
+    "**/.mypy_cache": true
+  },
+  "files.watcherExclude": {
+    "**/__pycache__/**": true,
+    "**/storage/**": true,
+  },
+  "search.exclude": {
+    "sql/02_schema.sql": false,
+    "sql/03_seed.sql": false
+  },
+  "files.associations": {
+    "*.html": "jinja-html",
+    "*.sql": "sql"
+  },
+  "editor.rulers": [100, 120],
+  "editor.tabSize": 4,
+  "[python]": { "editor.insertSpaces": true, "editor.tabSize": 4 },
+  "terminal.integrated.cwd": "${workspaceFolder}",
+  "sqltools.connections": [
+    {
+      "name": "VVH MySQL (local)",
+      "driver": "MySQL",
+      "server": "127.0.0.1",
+      "port": 3306,
+      "database": "vijay_vargiya_hospital",
+      "username": "vvh_app",
+      "password": ""
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+# --- python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- environment / secrets ---
+.env
+!.env.example
+
+# --- runtime artefacts ---
+storage/uploads/*
+storage/prescriptions/*
+!storage/uploads/.gitkeep
+!storage/prescriptions/.gitkeep
+!storage/prescriptions/invoices/.gitkeep
+*.log
+
+# --- editors / OS ---
+.vscode/*.local.json
+.idea/
+.DS_Store
+Thumbs.db
+credentials/
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/

@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}Billing &amp; payments{% endblock %}
+{% block content %}
+<div class="flex-between">
+  <h2 style="margin:0">Billing &amp; payments</h2>
+  <div class="row">
+    <button class="btn ghost sm" onclick="load()">Refresh</button>
+    <button class="btn ghost sm" onclick="loadReports()">Collection report</button>
+  </div>
+</div>
+
+<div class="grid g4" id="cards" style="margin-top:14px"></div>
+
+<div class="grid g2">
+  <div class="card">
+    <h3>Invoices</h3>
+    <div class="row" style="margin-bottom:10px">
+      <select id="status" onchange="load()">
+        <option value="">All statuses</option><option>UNPAID</option><option>PARTIAL</option>
+        <option>PAID</option><option>REFUNDED</option><option>CANCELLED</option></select>
+      <label class="row" style="gap:6px;text-transform:none"><input type="checkbox" id="pending" style="width:auto"
+        onchange="load()"/> Pending only</label>
+    </div>
+    <table>
+      <thead><tr><th>Invoice</th><th>Patient</th><th>Total</th><th>Balance</th><th>Status</th><th></th></tr></thead>
+      <tbody id="invRows"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Payments</h3>
+    <div class="row" style="margin-bottom:10px">
+      <select id="method" onchange="load()"><option value="">All methods</option>
+        <option>CASH</option><option>UPI</option><option>CARD</option><option>ONLINE</option></select>
+      <button class="btn ghost sm" onclick="loadRefunds()">Refund log</button>
+    </div>
+    <table>
+      <thead><tr><th>Code</th><th>Patient</th><th>Amount</th><th>Method</th><th>Status</th><th></th></tr></thead>
+      <tbody id="payRows"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Create invoice (consultation / procedure / other)</h3>
+  <div class="grid g4">
+    <div><label>Patient ID</label><input id="c_patient" type="number"/></div>
+    <div><label>Appointment ID (optional)</label><input id="c_appt" type="number"/></div>
+    <div><label>Doctor ID (optional)</label><input id="c_doctor" type="number"/></div>
+    <div><label>Tax %</label><input id="c_tax" type="number" value="0"/></div>
+    <div><label>Discount ₹</label><input id="c_discount" type="number" value="0"/></div>
+    <div><label>Discount reason</label><input id="c_reason"/></div>
+    <div><label>Item description</label><input id="c_desc" placeholder="Consultation - Dr ..."/></div>
+    <div><label>Unit price ₹</label><input id="c_price" type="number" value="500"/></div>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <button class="btn" onclick="createInvoice()">Create invoice</button>
+    <span id="cMsg" class="small"></span>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+if (guard()) { load(); loadReports(); }
+const qp = new URLSearchParams(location.search);
+
+async function loadReports() {
+  try {
+    const r = await api('/payments/reports/collection?days=30');
+    document.getElementById('cards').innerHTML = [
+      `<div class="kpi good"><div class="lbl">Collected (30 d)</div><div class="val">${fmt.money(r.total_collected)}</div></div>`,
+      `<div class="kpi warn"><div class="lbl">Refunded (30 d)</div><div class="val">${fmt.money(r.total_refunded)}</div></div>`,
+      ...(r.breakdown || []).slice(0,6).map(b =>
+        `<div class="kpi"><div class="lbl">${b.method} · ${b.status}</div><div class="val">${fmt.money(b.amount)}</div>
+         <div class="hint">${b.count} transaction(s)</div></div>`),
+    ].join('');
+  } catch (e) {}
+}
+
+async function load() {
+  try {
+    const p = new URLSearchParams();
+    if (document.getElementById('status').value) p.set('status_filter', document.getElementById('status').value);
+    if (document.getElementById('pending').checked) p.set('pending_only', 'true');
+    const invoices = await api('/invoices?' + p.toString());
+    document.getElementById('invRows').innerHTML = invoices.length ? invoices.map(i => `
+      <tr>
+        <td class="small"><b>${i.invoice_number}</b><div class="muted">#${i.id} · ${fmt.d(i.issued_at)}</div></td>
+        <td>${fmt.esc(i.patient_name||'')}</td>
+        <td>${fmt.money(i.total_amount)}<div class="muted small">disc ${fmt.money(i.discount_amount)} · tax ${fmt.money(i.tax_amount)}</div></td>
+        <td><b>${fmt.money(i.balance_amount)}</b></td>
+        <td>${badge(i.status)}</td>
+        <td class="right" style="white-space:nowrap">
+          <button class="btn ghost sm" onclick='openInvoice(${JSON.stringify(i)})'>Open</button>
+          ${i.balance_amount > 0 ? `<button class="btn sm" onclick="payModal(${i.id}, ${i.balance_amount})">Collect</button>` : ''}
+          <a class="btn ghost sm" target="_blank" href="/api/v1/invoices/${i.id}/receipt?token=${Auth.token()}">PDF</a>
+        </td>
+      </tr>`).join('') : '<tr><td colspan="6" class="muted">No invoices.</td></tr>';
+    if (qp.get('invoice')) {
+      const inv = invoices.find(i => i.id === +qp.get('invoice'));
+      if (inv) openInvoice(inv);
+    }
+
+    const mp = document.getElementById('method').value;
+    const payments = await api('/payments' + (mp ? '?method=' + mp : ''));
+    document.getElementById('payRows').innerHTML = payments.length ? payments.map(x => `
+      <tr><td class="small">${x.payment_code}</td><td>${fmt.esc(x.patient_name||'')}</td>
+      <td>${fmt.money(x.amount)}</td><td><span class="badge mute">${x.method}</span></td>
+      <td>${badge(x.status)}</td>
+      <td class="right" style="white-space:nowrap">
+        ${x.status === 'PAID' ? `<button class="btn bad sm" onclick="refundModal(${x.id}, ${x.amount})">Refund</button>` : ''}
+        ${x.status === 'PENDING' ? `<button class="btn ghost sm"
+          onclick="api('/payments/${x.id}/gateway-callback?status_value=PAID', {method:'POST'}).then(()=>{toast('Marked paid','ok');load();})">Mark paid</button>` : ''}
+      </td></tr>`).join('') : '<tr><td colspan="6" class="muted">No payments.</td></tr>';
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+function openInvoice(i) {
+  const box = document.createElement('div'); box.className = 'modal';
+  box.innerHTML = `<div class="box">
+    <div class="flex-between"><h3 style="margin:0">${i.invoice_number}</h3>
+      <button class="btn ghost sm" onclick="this.closest('.modal').remove()">Close</button></div>
+    <p class="small muted">${fmt.esc(i.patient_name)} · issued ${fmt.dt(i.issued_at)} · due ${i.due_date || '—'}</p>
+    <table><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead>
+    <tbody>${i.items.map(x => `<tr><td>${fmt.esc(x.description)}<div class="muted small">${x.item_type}</div></td>
+      <td>${x.quantity}</td><td>${fmt.money(x.unit_price)}</td><td>${fmt.money(x.amount)}</td></tr>`).join('')}
+      <tr><td colspan="3" class="right">Subtotal</td><td>${fmt.money(i.subtotal)}</td></tr>
+      <tr><td colspan="3" class="right">Discount</td><td>-${fmt.money(i.discount_amount)}</td></tr>
+      <tr><td colspan="3" class="right">Tax (${i.tax_percent}%)</td><td>${fmt.money(i.tax_amount)}</td></tr>
+      <tr><td colspan="3" class="right"><b>Total</b></td><td><b>${fmt.money(i.total_amount)}</b></td></tr>
+      <tr><td colspan="3" class="right">Paid</td><td>${fmt.money(i.paid_amount)}</td></tr>
+      <tr><td colspan="3" class="right"><b>Balance</b></td><td><b>${fmt.money(i.balance_amount)}</b></td></tr>
+    </tbody></table>
+    <div class="row" style="margin-top:12px">
+      <button class="btn" onclick="payModal(${i.id}, ${i.balance_amount});this.closest('.modal').remove()">Collect payment</button>
+      <a class="btn ghost" target="_blank" href="/api/v1/invoices/${i.id}/receipt?token=${Auth.token()}">Download receipt</a>
+      <button class="btn ghost" onclick="remind(${i.id})">Send reminder</button>
+    </div></div>`;
+  document.body.appendChild(box);
+}
+
+function payModal(invoiceId, balance) {
+  const box = document.createElement('div'); box.className = 'modal';
+  box.innerHTML = `<div class="box" style="max-width:420px">
+    <h3>Collect payment · invoice #${invoiceId}</h3>
+    <label>Amount ₹</label><input id="m_amt" type="number" value="${Number(balance).toFixed(2)}"/>
+    <label>Method</label><select id="m_method"><option>CASH</option><option>UPI</option><option>CARD</option><option>ONLINE</option></select>
+    <label>Reference / txn id</label><input id="m_ref"/>
+    <div class="row" style="margin-top:14px">
+      <button class="btn" onclick="collect(${invoiceId}, this)">Collect</button>
+      <button class="btn ghost" onclick="this.closest('.modal').remove()">Cancel</button></div></div>`;
+  document.body.appendChild(box);
+}
+
+async function collect(invoiceId, btn) {
+  try {
+    const p = await api('/payments', {method:'POST', body:{invoice_id: invoiceId,
+      amount: parseFloat(document.getElementById('m_amt').value),
+      method: document.getElementById('m_method').value, status:'PAID',
+      transaction_reference: document.getElementById('m_ref').value || null, notify_patient: true}});
+    toast('Payment ' + p.payment_code + ' recorded', 'ok');
+    btn.closest('.modal').remove(); load(); loadReports();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function refundModal(paymentId, amount) {
+  const amt = prompt('Refund amount (max ' + amount + ')', amount);
+  if (amt === null) return;
+  const reason = prompt('Refund reason', 'Patient cancelled') || '';
+  try {
+    const r = await api('/payments/' + paymentId + '/refund', {method:'POST', body:{amount: parseFloat(amt), reason}});
+    toast('Refund ' + r.refund_code + ' processed', 'ok'); load(); loadReports();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function remind(invoiceId) {
+  try { const r = await api('/invoices/' + invoiceId + '/remind', {method:'POST'});
+        toast(r.message || 'Reminder sent', 'ok'); } catch (e) { toast(e.message, 'err'); }
+}
+
+async function loadRefunds() {
+  try {
+    const rows = await api('/payments/refunds/all');
+    const box = document.createElement('div'); box.className = 'modal';
+    box.innerHTML = `<div class="box"><div class="flex-between"><h3 style="margin:0">Refunds</h3>
+      <button class="btn ghost sm" onclick="this.closest('.modal').remove()">Close</button></div>
+      <table><thead><tr><th>Code</th><th>Amount</th><th>Reason</th><th>Status</th><th>Date</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td>${r.refund_code}</td><td>${fmt.money(r.amount)}</td>
+        <td>${fmt.esc(r.reason||'')}</td><td>${badge(r.status)}</td><td>${fmt.d(r.created_at)}</td></tr>`).join('') ||
+        '<tr><td colspan="5" class="muted">No refunds</td></tr>'}</tbody></table></div>`;
+    document.body.appendChild(box);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function createInvoice() {
+  const msg = document.getElementById('cMsg');
+  const v = id => document.getElementById(id).value;
+  try {
+    const inv = await api('/invoices', {method:'POST', body:{
+      patient_id: +v('c_patient'), appointment_id: v('c_appt') ? +v('c_appt') : null,
+      doctor_id: v('c_doctor') ? +v('c_doctor') : null, tax_percent: parseFloat(v('c_tax') || '0'),
+      discount_amount: parseFloat(v('c_discount') || '0'), discount_reason: v('c_reason') || null,
+      items: [{item_type:'OTHER', description: v('c_desc') || 'Service', quantity: 1,
+               unit_price: parseFloat(v('c_price') || '0')}]}});
+    msg.innerHTML = `<span class="badge ok">${inv.invoice_number} · ${fmt.money(inv.total_amount)}</span>`;
+    load();
+  } catch (e) { msg.innerHTML = '<span class="badge bad">' + fmt.esc(e.message) + '</span>'; }
+}
+</script>
+{% endblock %}

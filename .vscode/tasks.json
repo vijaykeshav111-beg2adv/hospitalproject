@@ -1,0 +1,216 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "0. Setup / verify database (does everything)",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python scripts/setup.py",
+      "windows": {
+        "command": "${workspaceFolder}\\\\.venv\\\\Scripts\\\\python.exe scripts/setup.py"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "0b. Diagnose setup (changes nothing)",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python scripts/setup.py --check",
+      "windows": {
+        "command": "${workspaceFolder}\\\\.venv\\\\Scripts\\\\python.exe scripts/setup.py --check"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "1. Create virtual environment",
+      "type": "shell",
+      "command": "python -m venv .venv",
+      "windows": {
+        "command": "py -3 -m venv .venv"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "2. Install dependencies",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python -m pip install --upgrade pip && ${workspaceFolder}/.venv/bin/python -m pip install -r requirements.txt",
+      "windows": {
+        "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe -m pip install --upgrade pip ; ${workspaceFolder}\\.venv\\Scripts\\python.exe -m pip install -r requirements.txt"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "3a. (legacy) MySQL: apply 01 - see task 0 instead",
+      "type": "shell",
+      "command": "mysql -u root -p < sql/01_setup_database.sql",
+      "windows": {
+        "command": "cmd /c \"mysql -u root -p < sql\\01_setup_database.sql\""
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "3b. MySQL: apply 02 (schema)",
+      "type": "shell",
+      "command": "mysql -u root -p vijay_vargiya_hospital < sql/02_schema.sql",
+      "windows": {
+        "command": "cmd /c \"mysql -u root -p vijay_vargiya_hospital < sql\\02_schema.sql\""
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "3c. MySQL: apply 03 (seed data)",
+      "type": "shell",
+      "command": "mysql -u root -p vijay_vargiya_hospital < sql/03_seed.sql",
+      "windows": {
+        "command": "cmd /c \"mysql -u root -p vijay_vargiya_hospital < sql\\03_seed.sql\""
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "3d. MySQL: verify (04)",
+      "type": "shell",
+      "command": "mysql -u root -p vijay_vargiya_hospital < sql/04_verify.sql",
+      "windows": {
+        "command": "cmd /c \"mysql -u root -p vijay_vargiya_hospital < sql\\04_verify.sql\""
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "4. Seed demo data (patients + slots)",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python -m app.seed",
+      "windows": {
+        "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe -m app.seed"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "5. Run the app (http://127.0.0.1:8000/ui)",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python run.py --port 8000",
+      "windows": {
+        "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe run.py --port 8000"
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Run test suite (89 checks)",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python -m tests.smoke_test",
+      "windows": {
+        "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe -m tests.smoke_test"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Check UI + API of a running server",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python -m tests.page_check",
+      "windows": {
+        "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe -m tests.page_check"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "MySQL behaviour checks",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python -m tests.mysql_checks",
+      "windows": {
+        "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe -m tests.mysql_checks"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Hybrid fallback checks (169 checks)",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python -m tests.hybrid_fallback_check",
+      "windows": {
+        "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe -m tests.hybrid_fallback_check"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Live routing table (58 messages, needs the server running)",
+      "type": "shell",
+      "command": "${command:python.interpreterPath} -m tests.live_routing_table",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    },
+    {
+      "label": "Regenerate SQL from models",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python -m app.tools.export_schema sql/02_schema.sql && ${workspaceFolder}/.venv/bin/python -m app.tools.export_seed sql/03_seed.sql",
+      "windows": {
+        "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe -m app.tools.export_schema sql/02_schema.sql ; ${workspaceFolder}\\.venv\\Scripts\\python.exe -m app.tools.export_seed sql/03_seed.sql"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    }
+  ]
+}

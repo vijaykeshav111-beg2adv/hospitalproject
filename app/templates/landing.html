@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>Vijay Vargiya Group of Hospitals</h1>
+  <p>Multi-speciality care for the whole family &mdash; 12 specialties, 8 senior consultants and an
+     AI front desk that finds the right doctor, shows live slots and books your appointment in under a
+     minute. Walk in, or let the assistant do the paperwork first.</p>
+  <div class="cta">
+    <a class="btn" href="/ui/ai-chat">Talk to the AI assistant</a>
+    <a class="btn ghost" href="/ui/book">Book an appointment</a>
+    <a class="btn ghost" href="/ui/patient">Patient portal</a>
+  </div>
+  <div class="statline">
+    <div><span id="s-doctors">8</span><small>Doctors</small></div>
+    <div><span id="s-specialties">12</span><small>Specialties</small></div>
+    <div><span id="s-slots">-</span><small>Open slots today</small></div>
+    <div><span id="s-ai">24×7</span><small>AI booking desk</small></div>
+  </div>
+</section>
+
+<div class="grid g2" style="margin-top:18px">
+  <div class="card">
+    <h2>Available doctors</h2>
+    <div class="row small muted" style="margin-bottom:8px">
+      <select id="specFilter" style="max-width:260px"><option value="">All specialties</option></select>
+      <button class="btn ghost sm" id="reloadDoctors">Refresh</button>
+    </div>
+    <table><thead><tr><th>Doctor</th><th>Specialty</th><th>Fee</th><th>Next slot</th><th></th></tr></thead>
+      <tbody id="doctorRows"><tr><td colspan="5" class="muted">Loading…</td></tr></tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>Departments &amp; concern mapping</h2>
+    <p class="small muted">Tell the AI “knee pain since 2 weeks” and it maps your words to the right department.</p>
+    <div id="specList" class="grid" style="gap:9px"><div class="muted small">Loading…</div></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>How the AI front desk works</h2>
+  <div class="grid g4">
+    <div><b>1. You describe the problem</b><p class="small muted">“Fever with body ache for 3 days.”</p></div>
+    <div><b>2. It structures the concern</b><p class="small muted">Keywords, duration and severity are extracted
+      and matched to a specialty.</p></div>
+    <div><b>3. It shows live slots</b><p class="small muted">Real availability from the slot engine,
+      nothing invented.</p></div>
+    <div><b>4. It books &amp; notifies</b><p class="small muted">Holds the slot, books it and sends a WhatsApp
+      confirmation.</p></div>
+  </div>
+  <p class="small muted" style="margin-top:12px">Safety first: the assistant never diagnoses, never prescribes
+    and never gives medical advice. Emergencies are detected and escalated to the team immediately.</p>
+</div>
+
+<div class="card">
+  <div class="flex-between">
+    <h2 style="margin:0">Quick AI booking</h2><span class="small muted">No login needed to try</span>
+  </div>
+  <div id="quickChat" class="chat" style="margin-top:10px"></div>
+  <div class="row" style="margin-top:8px">
+    <input id="quickInput" placeholder="e.g. my child has fever since 2 days" onkeydown="if(event.key==='Enter')quickSend()"/>
+    <button class="btn" onclick="quickSend()">Send</button>
+  </div>
+  <div class="chips" id="quickChips"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let qConv = null, qSession = null;
+const chatBox = document.getElementById('quickChat');
+
+function bubble(role, text) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + role; d.textContent = text;
+  chatBox.appendChild(d); chatBox.scrollTop = chatBox.scrollHeight;
+  return d;
+}
+bubble('bot', 'Namaste! Welcome to Vijay Vargiya Group of Hospitals. Tell me your health concern ' +
+  '(for example "chest burning since 3 days") and I will find the right specialist and book a slot.');
+
+async function quickSend(preset) {
+  const input = document.getElementById('quickInput');
+  const text = preset || input.value.trim();
+  if (!text) return;
+  input.value = '';
+  bubble('user', text);
+  const thinking = bubble('sys', 'typing…');
+  try {
+    const res = await api('/ai/chat', {method:'POST', body:{
+      message: text, conversation_id: qConv, session_id: qSession, channel:'WEB'}});
+    qConv = res.conversation_id; qSession = res.session_id;
+    thinking.remove();
+    bubble('bot', res.reply);
+    if (res.safety && res.safety.flag) {
+      const flag = document.createElement('div');
+      flag.className = 'msg sys';
+      flag.textContent = 'safety check: ' + res.safety.flag.replace(/_/g,' ').toLowerCase() +
+        (res.escalation ? ' · escalated to ' + res.escalation.level.toLowerCase() : '');
+      chatBox.appendChild(flag); chatBox.scrollTop = chatBox.scrollHeight;
+    }
+    const chips = document.getElementById('quickChips');
+    chips.innerHTML = '';
+    (res.quick_replies || []).forEach(c => {
+      const b = document.createElement('button'); b.className = 'chip'; b.textContent = c;
+      b.onclick = () => quickSend(c); chips.appendChild(b);
+    });
+    if ((res.slots || []).length) {
+      const wrap = document.createElement('div'); wrap.className = 'chips';
+      res.slots.slice(0,4).forEach(s => {
+        const b = document.createElement('button'); b.className = 'chip';
+        b.textContent = s.label + ' · ₹' + s.fee;
+        b.onclick = async () => { await api('/ai/chat', {method:'POST', body:{message:'slot ' + s.label,
+          conversation_id:qConv, selected_slot_id:s.slot_id}}).then(r => {
+            bubble('bot', r.reply); qConv = r.conversation_id; }); };
+        wrap.appendChild(b);
+      });
+      chatBox.appendChild(wrap); chatBox.scrollTop = chatBox.scrollHeight;
+    }
+  } catch (e) {
+    thinking.remove(); bubble('sys', 'error: ' + e.message);
+  }
+}
+quickSend('hello');
+
+(async function loadPublic() {
+  try {
+    const specs = await api('/specialties?active_only=true');
+    document.getElementById('s-specialties').textContent = specs.length;
+    const sel = document.getElementById('specFilter');
+    specs.forEach(s => sel.insertAdjacentHTML('beforeend', `<option value="${s.id}">${fmt.esc(s.name)}</option>`));
+    document.getElementById('specList').innerHTML = specs.map(s => `
+      <div style="border:1px solid var(--line);border-radius:11px;padding:10px 12px">
+        <div class="flex-between"><b>${fmt.esc(s.name)}</b><span class="badge info">₹${s.consultation_fee}</span></div>
+        <div class="small muted">${fmt.esc(s.description || '')}</div>
+        <div class="small" style="margin-top:5px"><b>${s.doctor_count}</b> doctor(s) ·
+          <span class="muted">maps:</span> ${(s.concerns||[]).slice(0,6).map(fmt.esc).join(', ') || '—'}</div>
+      </div>`).join('');
+    await loadDoctors();
+  } catch (e) { document.getElementById('specList').innerHTML = '<div class="muted small">'+e.message+'</div>'; }
+})();
+
+async function loadDoctors() {
+  const specId = document.getElementById('specFilter').value;
+  const rows = document.getElementById('doctorRows');
+  rows.innerHTML = '<tr><td colspan="5" class="muted">Loading…</td></tr>';
+  try {
+    const doctors = await api('/doctors?active_only=true' + (specId ? '&specialty_id=' + specId : ''));
+    document.getElementById('s-doctors').textContent = doctors.length;
+    if (!doctors.length) { rows.innerHTML = '<tr><td colspan="5" class="muted">No doctors found</td></tr>'; return; }
+    const cards = await Promise.all(doctors.map(async d => {
+      let next = '—';
+      try {
+        const av = await api('/doctors/' + d.id + '/availability?days_ahead=7');
+        const slots = (av.slots || []);
+        next = slots.length ? slots[0].label : 'No open slots in 7 days';
+      } catch (e) {}
+      return {d, next};
+    }));
+    document.getElementById('s-slots').textContent = cards.filter(c => c.next.includes('at')).length;
+    rows.innerHTML = cards.map(({d, next}) => `
+      <tr>
+        <td><b>${fmt.esc(d.full_name)}</b><div class="small muted">${fmt.esc(d.qualifications||'')}</div></td>
+        <td>${fmt.esc(d.specialty_name||'')}<div class="small muted">${d.experience_years||0} yrs</div></td>
+        <td>₹${Number(d.consultation_fee).toFixed(0)}</td>
+        <td class="small">${fmt.esc(next)}</td>
+        <td class="right"><a class="btn sm" href="/ui/book?doctor_id=${d.id}">Book</a></td>
+      </tr>`).join('');
+  } catch (e) { rows.innerHTML = `<tr><td colspan="5" class="muted">${e.message}</td></tr>`; }
+}
+document.getElementById('reloadDoctors').onclick = loadDoctors;
+document.getElementById('specFilter').onchange = loadDoctors;
+</script>
+{% endblock %}

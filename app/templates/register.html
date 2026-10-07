@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Patient registration{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Create your patient account</h2>
+  <p class="small muted">Registering creates your hospital patient ID (VVH-YYYY-NNNNN) and portal login in one step.</p>
+  <div class="grid g2">
+    <div>
+      <label>Full name *</label><input id="full_name" placeholder="Ramesh Yadav"/>
+      <label>Mobile number *</label><input id="phone" placeholder="9876543210"/>
+      <label>Email *</label><input id="email" type="email" placeholder="you@example.com"/>
+      <label>Password *</label><input id="password" type="password" placeholder="min 8 chars, mixed case + digit"/>
+      <label>Date of birth</label><input id="date_of_birth" type="date"/>
+    </div>
+    <div>
+      <label>Gender</label>
+      <select id="gender"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select>
+      <label>Blood group</label>
+      <select id="blood_group"><option value="">Select</option>
+        <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+        <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select>
+      <label>City</label><input id="city" placeholder="Jaipur"/>
+      <label>State</label><input id="state" value="Rajasthan"/>
+      <label>Emergency contact (name / phone / relation)</label>
+      <input id="emergency_contact_name" placeholder="Name"/>
+      <div class="row" style="margin-top:8px">
+        <input id="emergency_contact_phone" placeholder="Phone"/>
+        <input id="emergency_contact_relation" placeholder="Relation"/>
+      </div>
+    </div>
+  </div>
+  <div class="row" style="margin-top:16px">
+    <button class="btn" id="regBtn" onclick="register()">Create account</button>
+    <a class="btn ghost" href="/ui/login">Already registered? Sign in</a>
+  </div>
+  <div id="msg" class="small" style="margin-top:12px"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function register() {
+  const btn = document.getElementById('regBtn'), msg = document.getElementById('msg');
+  const v = id => document.getElementById(id).value.trim();
+  const body = {
+    full_name: v('full_name'), phone: v('phone'), email: v('email'), password: v('password'),
+    role: 'PATIENT', date_of_birth: v('date_of_birth') || null, gender: v('gender') || null,
+    blood_group: v('blood_group') || null, city: v('city') || null, state: v('state') || null,
+    emergency_contact_name: v('emergency_contact_name') || null,
+    emergency_contact_phone: v('emergency_contact_phone') || null,
+    emergency_contact_relation: v('emergency_contact_relation') || null,
+  };
+  btn.disabled = true; msg.textContent = '';
+  try {
+    const data = await api('/auth/register', {method:'POST', body});
+    Auth.save(data);
+    msg.innerHTML = '<span class="badge ok">Patient account created</span>';
+    const me = await api('/auth/me');
+    msg.innerHTML += ' <span class="small muted">Patient ID: ' +
+      (me.patient_profile ? me.patient_profile.patient_code : 'creating…') + '</span>';
+    setTimeout(() => location.href = '/ui/patient', 900);
+  } catch (e) {
+    msg.innerHTML = '<span class="badge bad">' + fmt.esc(e.message) + '</span>';
+  } finally { btn.disabled = false; }
+}
+</script>
+{% endblock %}

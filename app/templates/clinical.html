@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block title %}Clinical workspace{% endblock %}
+{% block content %}
+<h2>Clinical workspace</h2>
+<p class="small muted">Consultation notes, vitals, diagnosis (doctor-entered), prescriptions, follow-ups,
+medical files and the patient's previous records — all with full audit.</p>
+
+<div class="grid g2">
+  <div class="card">
+    <h3>Consultation</h3>
+    <div class="row">
+      <select id="appt" style="min-width:280px"><option value="">— select an appointment —</option></select>
+      <button class="btn ghost sm" onclick="loadAppointments()">Reload</button>
+    </div>
+    <div id="ctx" class="small" style="margin-top:10px"></div>
+
+    <label>Chief complaint</label><textarea id="cc" rows="2"></textarea>
+    <div class="row" style="margin-top:8px">
+      <input id="bp" placeholder="BP e.g. 120/80" style="max-width:130px"/>
+      <input id="pulse" placeholder="Pulse" style="max-width:100px"/>
+      <input id="temp" placeholder="Temp °F" style="max-width:110px"/>
+      <input id="spo2" placeholder="SpO₂ %" style="max-width:100px"/>
+      <input id="wt" placeholder="Weight kg" style="max-width:110px"/>
+    </div>
+    <label>Observations</label><textarea id="obs" rows="2"></textarea>
+    <label>Diagnosis <span class="muted" style="text-transform:none">(entered by the doctor)</span></label>
+    <textarea id="dx" rows="2"></textarea>
+    <label>Clinical notes</label><textarea id="notes" rows="2"></textarea>
+    <label>Advice</label><textarea id="advice" rows="2"></textarea>
+    <div class="row" style="margin-top:8px">
+      <label class="row" style="gap:6px;text-transform:none"><input type="checkbox" id="fu" style="width:auto"/>
+        Follow-up required</label>
+      <input id="fuDate" type="date" style="max-width:180px"/>
+      <input id="fuNotes" placeholder="follow-up note"/>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn" id="startBtn" onclick="startConsultation()">Start consultation</button>
+      <button class="btn ghost" id="saveBtn" onclick="saveConsultation()">Save notes</button>
+      <button class="btn dark" id="doneBtn" onclick="completeConsultation()">Complete visit</button>
+    </div>
+    <div id="cmsg" class="small" style="margin-top:10px"></div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h3>Prescription</h3>
+      <div class="row">
+        <select id="medPick" style="flex:1"><option value="">— pick a medicine from the master —</option></select>
+        <button class="btn ghost sm" onclick="addMedicine()">Add</button>
+      </div>
+      <table style="margin-top:10px">
+        <thead><tr><th>Medicine</th><th>Dosage</th><th>Freq</th><th>Duration</th><th></th></tr></thead>
+        <tbody id="rxRows"><tr><td colspan="5" class="muted">No medicines added.</td></tr></tbody>
+      </table>
+      <label>Advice on prescription</label><input id="rxAdvice"/>
+      <div class="row" style="margin-top:10px">
+        <button class="btn" onclick="issueRx()">Issue prescription &amp; PDF</button>
+        <span id="rxMsg" class="small"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Patient context</h3>
+      <div id="patientCtx" class="small muted">Select an appointment to load the patient's history.</div>
+      <h3 class="sub">Medical files</h3>
+      <div id="fileList" class="small muted">—</div>
+      <div class="row" style="margin-top:10px">
+        <input id="upTitle" placeholder="file title" style="flex:1"/>
+        <select id="upCat" style="max-width:150px">
+          <option>LAB_REPORT</option><option>SCAN</option><option>IMAGE</option><option>PDF</option>
+          <option>PRESCRIPTION</option><option>DISCHARGE</option><option>OTHER</option></select>
+        <input id="upFile" type="file"/>
+        <button class="btn ghost sm" onclick="uploadFile()">Upload</button>
+      </div>
+      <div id="upMsg" class="small" style="margin-top:8px"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let consultation = null, patientId = null, appointmentId = null, rxItems = [];
+
+if (guard()) init();
+
+async function init() {
+  const meds = await api('/medicines?active_only=true');
+  document.getElementById('medPick').innerHTML += meds.map(m =>
+    `<option value="${m.id}" data-dose="${fmt.esc(m.default_dosage||'')}" data-dur="${fmt.esc(m.default_duration||'')}"
+      data-ins="${fmt.esc(m.instructions||'')}">${fmt.esc(m.name)} ${fmt.esc(m.strength||'')}</option>`).join('');
+  await loadAppointments();
+  const qp = new URLSearchParams(location.search);
+  if (qp.get('appointment')) {
+    document.getElementById('appt').value = qp.get('appointment');
+    onAppointmentChange();
+  }
+}
+
+async function loadAppointments() {
+  const rows = await api('/appointments?limit=60');
+  const sel = document.getElementById('appt');
+  sel.innerHTML = '<option value="">— select an appointment —</option>' + rows.map(a =>
+    `<option value="${a.id}">${a.appointment_code} · ${fmt.esc(a.patient_name)} · ${a.appointment_date} ${a.start_time?.slice(0,5)} · ${a.status}</option>`).join('');
+  sel.onchange = onAppointmentChange;
+}
+
+async function onAppointmentChange() {
+  const id = document.getElementById('appt').value;
+  if (!id) return;
+  appointmentId = +id;
+  const appt = await api('/appointments/' + id);
+  patientId = appt.patient_id;
+  document.getElementById('ctx').innerHTML =
+    `<span class="badge info">${fmt.esc(appt.patient_name)}</span> ${appt.patient_code} ·
+     ${fmt.esc(appt.patient_phone||'')} · ${fmt.esc(appt.doctor_name)} · ${badge(appt.queue_status)}`;
+  document.getElementById('cc').value = appt.reason || '';
+  const [profile, files] = await Promise.all([
+    api('/patients/' + patientId), api('/medical-files?patient_id=' + patientId)]);
+  const past = profile.previous_appointments || [];
+  document.getElementById('patientCtx').innerHTML = `
+    <div><b>Allergies:</b> ${fmt.esc(profile.allergies || 'none')} · <b>Chronic:</b> ${fmt.esc(profile.chronic_conditions || 'none')}</div>
+    <div style="margin:6px 0"><b>Previous visits:</b> ${past.length}</div>
+    <div class="timeline">${(profile.consultations||[]).slice(0,5).map(c => `<div class="t">
+      ${fmt.d(c.started_at)} · ${fmt.esc(c.diagnosis || 'no diagnosis')}
+      <div class="muted">${fmt.esc((c.advice||'').slice(0,80))}</div></div>`).join('') || '<span class="muted">No previous consultations</span>'}</div>
+    <div><b>Previous prescriptions:</b> ${(profile.prescriptions||[]).map(p =>
+      `<a target="_blank" href="/api/v1/prescriptions/${p.id}/pdf?token=${Auth.token()}">${p.prescription_code}</a>`).join(' · ') || 'none'}</div>`;
+  document.getElementById('fileList').innerHTML = files.length ? files.map(f =>
+    `<div><span class="badge mute">${f.category}</span> <a target="_blank"
+      href="/api/v1/medical-files/${f.id}/download?token=${Auth.token()}">${fmt.esc(f.title)}</a>
+      <span class="muted">${(f.size_bytes/1024).toFixed(0)} KB</span></div>`).join('') : '<span class="muted">No files</span>';
+}
+
+async function startConsultation() {
+  const msg = document.getElementById('cmsg');
+  if (!patientId) return toast('Select an appointment first', 'warn');
+  try {
+    consultation = await api('/consultations', {method:'POST', body:{
+      appointment_id: appointmentId, patient_id: patientId,
+      chief_complaint: document.getElementById('cc').value || null,
+      vitals: collectVitals()}});
+    msg.innerHTML = '<span class="badge ok">Consultation ' + consultation.consultation_code + ' started</span>';
+    toast('Consultation started', 'ok');
+  } catch (e) { msg.innerHTML = '<span class="badge bad">' + fmt.esc(e.message) + '</span>'; }
+}
+
+function collectVitals() {
+  const v = {bp: document.getElementById('bp').value, pulse: document.getElementById('pulse').value,
+             temp_f: document.getElementById('temp').value, spo2: document.getElementById('spo2').value,
+             weight_kg: document.getElementById('wt').value};
+  Object.keys(v).forEach(k => { if (!v[k]) delete v[k]; });
+  return Object.keys(v).length ? v : null;
+}
+
+async function saveConsultation() {
+  const msg = document.getElementById('cmsg');
+  if (!consultation) return toast('Start the consultation first', 'warn');
+  try {
+    consultation = await api('/consultations/' + consultation.id, {method:'PATCH', body:{
+      chief_complaint: document.getElementById('cc').value, vitals: collectVitals(),
+      observations: document.getElementById('obs').value, diagnosis: document.getElementById('dx').value,
+      clinical_notes: document.getElementById('notes').value, advice: document.getElementById('advice').value,
+      follow_up_required: document.getElementById('fu').checked,
+      follow_up_date: document.getElementById('fuDate').value || null,
+      follow_up_notes: document.getElementById('fuNotes').value || null}});
+    msg.innerHTML = '<span class="badge ok">Saved — records created</span>';
+  } catch (e) { msg.innerHTML = '<span class="badge bad">' + fmt.esc(e.message) + '</span>'; }
+}
+
+async function completeConsultation() {
+  if (!consultation) return toast('Start the consultation first', 'warn');
+  try {
+    await saveConsultation();
+    const c = await api('/consultations/' + consultation.id + '/complete', {method:'POST'});
+    toast('Visit completed' + (c.follow_up_date ? ' · follow-up ' + c.follow_up_date : ''), 'ok');
+    loadAppointments();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+function addMedicine() {
+  const sel = document.getElementById('medPick');
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt || !opt.value) return;
+  rxItems.push({medicine_id: +opt.value, medicine_name: opt.textContent.trim(),
+                dosage: opt.dataset.dose || '', frequency: opt.dataset.dose || '',
+                duration: opt.dataset.dur || '', instructions: opt.dataset.ins || '', quantity: 1});
+  renderRx();
+}
+
+function renderRx() {
+  document.getElementById('rxRows').innerHTML = rxItems.length ? rxItems.map((m, i) => `
+    <tr><td>${fmt.esc(m.medicine_name)}</td><td>${fmt.esc(m.dosage)}</td><td>${fmt.esc(m.frequency)}</td>
+    <td>${fmt.esc(m.duration)}</td>
+    <td class="right"><button class="btn bad sm" onclick="rxRemove(${i})">×</button></td></tr>`).join('')
+    : '<tr><td colspan="5" class="muted">No medicines added.</td></tr>';
+}
+
+function rxRemove(i) { rxItems.splice(i, 1); renderRx(); }
+
+async function issueRx() {
+  const msg = document.getElementById('rxMsg');
+  if (!patientId) return toast('Select a patient first', 'warn');
+  try {
+    const rx = await api('/prescriptions', {method:'POST', body:{
+      consultation_id: consultation ? consultation.id : null, appointment_id: appointmentId,
+      patient_id: patientId, diagnosis_summary: document.getElementById('dx').value || null,
+      advice: document.getElementById('rxAdvice').value || document.getElementById('advice').value || null,
+      items: rxItems, notify_patient: true}});
+    msg.innerHTML = `<span class="badge ok">${rx.prescription_code} issued</span>`;
+    window.open('/api/v1/prescriptions/' + rx.id + '/pdf?token=' + Auth.token(), '_blank');
+  } catch (e) { msg.innerHTML = '<span class="badge bad">' + fmt.esc(e.message) + '</span>'; }
+}
+
+async function uploadFile() {
+  const file = document.getElementById('upFile').files[0];
+  const msg = document.getElementById('upMsg');
+  if (!file || !patientId) return toast('Pick a file and a patient', 'warn');
+  const form = new FormData();
+  form.append('file', file);
+  form.append('patient_id', patientId);
+  form.append('category', document.getElementById('upCat').value);
+  form.append('title', document.getElementById('upTitle').value || file.name);
+  try {
+    const f = await api('/medical-files', {method:'POST', form});
+    msg.innerHTML = `<span class="badge ok">Uploaded ${fmt.esc(f.title)}</span>`;
+    onAppointmentChange();
+  } catch (e) { msg.innerHTML = '<span class="badge bad">' + fmt.esc(e.message) + '</span>'; }
+}
+</script>
+{% endblock %}

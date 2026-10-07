@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}Security &amp; audit{% endblock %}
+{% block content %}
+<div class="flex-between">
+  <h2 style="margin:0">Security &amp; audit</h2>
+  <div class="row">
+    <button class="btn ghost sm" onclick="load()">Refresh</button>
+    <a class="btn ghost sm" href="/api/v1/permissions/matrix" target="_blank">RBAC matrix (JSON)</a>
+  </div>
+</div>
+
+<div class="grid g4" id="cards" style="margin-top:14px"></div>
+
+<div class="grid g2">
+  <div class="card">
+    <h3>Audit trail</h3>
+    <div class="row" style="margin-bottom:10px">
+      <select id="action" onchange="loadAudit()"><option value="">All actions</option></select>
+      <input id="resource" placeholder="resource contains" onkeydown="if(event.key==='Enter')loadAudit()"/>
+      <button class="btn ghost sm" onclick="loadAudit()">Filter</button>
+    </div>
+    <div id="audit" class="small muted">Loading…</div>
+  </div>
+
+  <div class="card">
+    <h3>Login activity</h3>
+    <div class="row" style="margin-bottom:10px">
+      <select id="lstatus" onchange="loadLogins()">
+        <option value="">All</option><option>SUCCESS</option><option>FAILED</option>
+        <option>LOCKED</option><option>LOGOUT</option></select>
+      <input id="lemail" placeholder="email" onkeydown="if(event.key==='Enter')loadLogins()"/>
+      <button class="btn ghost sm" onclick="loadLogins()">Filter</button>
+    </div>
+    <div id="logins" class="small muted">Loading…</div>
+  </div>
+</div>
+
+<div class="grid g2">
+  <div class="card">
+    <h3>Active sessions</h3>
+    <div id="sessions" class="small muted">Loading…</div>
+    <button class="btn ghost sm" style="margin-top:10px" onclick="logoutAll()">Logout all my devices</button>
+  </div>
+  <div class="card">
+    <h3>Users &amp; roles</h3>
+    <div class="row" style="margin-bottom:10px">
+      <input id="usearch" placeholder="search users" onkeydown="if(event.key==='Enter')loadUsers()"/>
+      <select id="urole" onchange="loadUsers()"><option value="">All roles</option>
+        <option>SUPER_ADMIN</option><option>ADMIN</option><option>DOCTOR</option>
+        <option>RECEPTIONIST</option><option>ACCOUNTANT</option><option>PATIENT</option></select>
+    </div>
+    <div id="users" class="small muted">Loading…</div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Password &amp; session policy</h3>
+  <div class="grid g3 small">
+    <div class="kpi"><div class="lbl">Hashing</div><div class="val" style="font-size:16px">PBKDF2-SHA256</div>
+      <div class="hint">260,000 iterations, per-user salt</div></div>
+    <div class="kpi"><div class="lbl">Access token</div><div class="val" style="font-size:16px">60 min JWT</div>
+      <div class="hint">HS256, jti bound to a session row</div></div>
+    <div class="kpi"><div class="lbl">Refresh token</div><div class="val" style="font-size:16px">14 days</div>
+      <div class="hint">rotated on every refresh, hashed at rest</div></div>
+    <div class="kpi warn"><div class="lbl">Lockout</div><div class="val" style="font-size:16px">5 fails / 15 min</div></div>
+    <div class="kpi"><div class="lbl">RBAC</div><div class="val" style="font-size:16px">6 roles</div>
+      <div class="hint">permission-per-endpoint enforcement</div></div>
+    <div class="kpi good"><div class="lbl">Audit</div><div class="val" style="font-size:16px">old → new values</div>
+      <div class="hint">actor, action, resource, IP, UA</div></div>
+  </div>
+
+  <h3 class="sub">Change my password</h3>
+  <div class="row">
+    <input id="cur" type="password" placeholder="current password" style="max-width:240px"/>
+    <input id="new" type="password" placeholder="new password" style="max-width:240px"/>
+    <button class="btn" onclick="changePwd()">Update</button>
+    <span id="pwdMsg" class="small"></span>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+if (guard()) { load(); loadAudit(); loadLogins(); loadUsers(); }
+
+async function load() {
+  try {
+    const s = await api('/auth/audit-logs/summary');
+    document.getElementById('cards').innerHTML = [
+      `<div class="kpi"><div class="lbl">Audit entries</div><div class="val">${s.total_audit_entries}</div></div>`,
+      `<div class="kpi good"><div class="lbl">Successful logins</div><div class="val">${s.successful_logins}</div></div>`,
+      `<div class="kpi bad"><div class="lbl">Failed / locked</div><div class="val">${s.failed_logins}</div></div>`,
+      `<div class="kpi alt"><div class="lbl">Top action</div><div class="val" style="font-size:17px">${s.by_action[0]?.action || '—'}</div>
+        <div class="hint">${s.by_action[0]?.count || 0} events</div></div>`,
+    ].join('');
+    const sel = document.getElementById('action');
+    if (sel.options.length <= 1) s.by_action.forEach(a => sel.insertAdjacentHTML('beforeend',
+      `<option value="${a.action}">${a.action} (${a.count})</option>`));
+    await loadSessions();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function loadSessions() {
+  try {
+    const rows = await api('/auth/sessions');
+    document.getElementById('sessions').innerHTML = rows.length ? `<table><thead><tr><th>Device</th><th>IP</th>
+      <th>Created</th><th>Last seen</th><th></th></tr></thead><tbody>${rows.map(s => `<tr>
+      <td>${fmt.esc(s.device||'web')}<div class="muted">${fmt.esc((s.user_agent||'').slice(0,40))}</div></td>
+      <td>${fmt.esc(s.ip_address||'')}</td><td>${fmt.dt(s.created_at)}</td><td>${fmt.dt(s.last_seen_at)}</td>
+      <td class="right"><button class="btn bad sm" onclick="revoke(${s.id})">Revoke</button></td></tr>`).join('')}
+      </tbody></table>` : '<span class="muted">No active sessions.</span>';
+  } catch (e) {}
+}
+
+async function revoke(id) {
+  try { await api('/auth/sessions/' + id, {method:'DELETE'}); toast('Session revoked', 'ok'); loadSessions(); }
+  catch (e) { toast(e.message, 'err'); }
+}
+async function logoutAll() {
+  try { await api('/auth/logout?everywhere=true', {method:'POST'}); Auth.clear(); location.href='/ui/login'; }
+  catch (e) { toast(e.message, 'err'); }
+}
+
+async function loadAudit() {
+  const p = new URLSearchParams();
+  if (document.getElementById('action').value) p.set('action', document.getElementById('action').value);
+  const box = document.getElementById('audit');
+  try {
+    const rows = await api('/auth/audit-logs?' + p.toString() + '&limit=120');
+    const filtered = rows.filter(r => !document.getElementById('resource').value ||
+      (r.resource||'').includes(document.getElementById('resource').value));
+    box.innerHTML = filtered.length ? `<table><thead><tr><th>When</th><th>Actor</th><th>Action</th>
+      <th>Resource</th><th>Old → New</th><th>IP</th></tr></thead><tbody>${filtered.map(r => `<tr>
+      <td>${fmt.dt(r.created_at)}</td>
+      <td>${fmt.esc(r.user_email||'system')}<div class="muted">${fmt.esc(r.user_role||'')}</div></td>
+      <td><span class="badge info">${r.action}</span></td>
+      <td>${fmt.esc(r.resource)} ${r.resource_id ? '#' + r.resource_id : ''}</td>
+      <td class="small">${fmt.esc(JSON.stringify(r.previous_value||{}).slice(0,60))} →
+        ${fmt.esc(JSON.stringify(r.new_value||{}).slice(0,60))}</td>
+      <td>${fmt.esc(r.ip_address||'')}</td></tr>`).join('')}</tbody></table>` : '<span class="muted">No entries.</span>';
+  } catch (e) { box.innerHTML = '<span class="badge bad">' + fmt.esc(e.message) + '</span>'; }
+}
+
+async function loadLogins() {
+  const p = new URLSearchParams();
+  if (document.getElementById('lstatus').value) p.set('status_filter', document.getElementById('lstatus').value);
+  if (document.getElementById('lemail').value) p.set('email', document.getElementById('lemail').value);
+  const box = document.getElementById('logins');
+  try {
+    const rows = await api('/auth/login-activity?' + p.toString() + '&limit=120');
+    box.innerHTML = rows.length ? `<table><thead><tr><th>When</th><th>Email</th><th>Status</th>
+      <th>Reason</th><th>IP</th></tr></thead><tbody>${rows.map(r => `<tr>
+      <td>${fmt.dt(r.attempt_at)}</td><td>${fmt.esc(r.email_attempted)}</td>
+      <td>${badge(r.status)}</td><td>${fmt.esc(r.reason||'')}</td><td>${fmt.esc(r.ip_address||'')}</td></tr>`).join('')}
+      </tbody></table>` : '<span class="muted">No activity.</span>';
+  } catch (e) { box.innerHTML = '<span class="badge bad">' + fmt.esc(e.message) + '</span>'; }
+}
+
+async function loadUsers() {
+  const p = new URLSearchParams();
+  if (document.getElementById('usearch').value) p.set('search', document.getElementById('usearch').value);
+  if (document.getElementById('urole').value) p.set('role', document.getElementById('urole').value);
+  const box = document.getElementById('users');
+  try {
+    const rows = await api('/users?' + p.toString());
+    box.innerHTML = `<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
+      <tbody>${rows.map(u => `<tr><td>${fmt.esc(u.full_name)}<div class="muted">${fmt.dt(u.last_login_at)}</div></td>
+      <td class="small">${fmt.esc(u.email)}</td><td><span class="badge info">${u.role_name}</span></td>
+      <td>${u.is_active ? '<span class="badge ok">active</span>' : '<span class="badge bad">disabled</span>'}</td>
+      <td class="right">${u.is_active ? `<button class="btn ghost sm"
+        onclick="toggleUser(${u.id}, false)">Disable</button>` : `<button class="btn ghost sm"
+        onclick="toggleUser(${u.id}, true)">Enable</button>`}
+        <button class="btn ghost sm" onclick="unlock(${u.id})">Unlock</button></td></tr>`).join('')}</tbody></table>`;
+  } catch (e) { box.innerHTML = '<span class="badge bad">' + fmt.esc(e.message) + '</span>'; }
+}
+
+async function toggleUser(id, active) {
+  try { await api('/users/' + id, {method:'PATCH', body:{is_active: active}}); toast('Updated', 'ok'); loadUsers(); }
+  catch (e) { toast(e.message, 'err'); }
+}
+async function unlock(id) {
+  try { await api('/users/' + id + '/unlock', {method:'POST'}); toast('Unlocked', 'ok'); }
+  catch (e) { toast(e.message, 'err'); }
+}
+async function changePwd() {
+  const msg = document.getElementById('pwdMsg');
+  try {
+    const r = await api('/auth/change-password', {method:'POST', body:{
+      current_password: document.getElementById('cur').value,
+      new_password: document.getElementById('new').value}});
+    msg.innerHTML = '<span class="badge ok">' + fmt.esc(r.message) + '</span>';
+  } catch (e) { msg.innerHTML = '<span class="badge bad">' + fmt.esc(e.message) + '</span>'; }
+}
+</script>
+{% endblock %}

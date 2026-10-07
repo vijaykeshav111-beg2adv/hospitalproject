@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}AI assistant{% endblock %}
+{% block content %}
+<div class="flex-between">
+  <h2 style="margin:0">AI front-desk assistant</h2>
+  <div class="row small muted">
+    <span id="stageBadge" class="badge info">stage: idle</span>
+    <span id="intentBadge" class="badge mute">intent: —</span>
+    <button class="btn ghost sm" onclick="resetChat()">New conversation</button>
+  </div>
+</div>
+
+<div class="grid g2" style="margin-top:14px">
+  <div class="card">
+    <div id="chat" class="chat" style="height:56vh"></div>
+    <div class="row" style="margin-top:10px">
+      <input id="msg" placeholder="Describe your concern, ask for reports, ask to cancel…"
+             onkeydown="if(event.key==='Enter')send()"/>
+      <button class="btn" id="sendBtn" onclick="send()">Send</button>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="small muted" style="margin-top:10px">
+      The assistant books, reschedules, cancels, looks up reports/prescriptions/bills and escalates to a human.
+      It never diagnoses, prescribes or gives medical advice.
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h3>Live assistant trace</h3>
+      <div id="trace" class="small muted">No activity yet.</div>
+    </div>
+    <div class="card">
+      <h3>Structured state</h3>
+      <pre id="state" style="white-space:pre-wrap;font-size:12px;margin:0" class="muted">{}</pre>
+    </div>
+    <div class="card">
+      <h3>Try these</h3>
+      <div class="chips">
+        <button class="chip" onclick="send('fever and body ache since 3 days')">fever since 3 days</button>
+        <button class="chip" onclick="send('knee pain while climbing stairs')">knee pain</button>
+        <button class="chip" onclick="send('show my last prescription')">my prescription</button>
+        <button class="chip" onclick="send('what is my payment status?')">payment status</button>
+        <button class="chip" onclick="send('I want to cancel my appointment')">cancel appointment</button>
+        <button class="chip" onclick="send('should I take paracetamol for this fever?')">medical advice test</button>
+        <button class="chip" onclick="send('I have severe chest pain and cannot breathe')">emergency test</button>
+        <button class="chip" onclick="send('talk to reception')">human escalation</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let conv = null, session = null, picks = [];
+const box = document.getElementById('chat');
+
+function bubble(role, text) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + role; d.textContent = text;
+  box.appendChild(d); box.scrollTop = box.scrollHeight; return d;
+}
+bubble('bot', 'Namaste! I am the AI front desk of Vijay Vargiya Group of Hospitals.\n' +
+  'Tell me your concern in your own words and I will find the right specialist, show live slots and book ' +
+  'your appointment. I can also look up reports, prescriptions and bills.');
+
+function log(msg, kind='') {
+  const t = document.getElementById('trace');
+  if (t.textContent.startsWith('No activity')) t.textContent = '';
+  t.innerHTML += `<div>${kind ? `<span class="badge ${kind}">${kind}</span> ` : ''}${fmt.esc(msg)}</div>`;
+}
+
+async function send(preset) {
+  const input = document.getElementById('msg');
+  const text = preset || input.value.trim();
+  if (!text) return;
+  input.value = '';
+  bubble('user', text);
+  const t = bubble('sys', 'thinking…');
+  const btn = document.getElementById('sendBtn'); btn.disabled = true;
+  try {
+    const res = await api('/ai/chat', {method:'POST', body:{
+      message: text, conversation_id: conv, session_id: session, channel:'WEB'}});
+    conv = res.conversation_id; session = res.session_id;
+    t.remove();
+    bubble('bot', res.reply);
+    document.getElementById('stageBadge').textContent = 'stage: ' + res.stage;
+    document.getElementById('intentBadge').textContent = 'intent: ' + res.intent +
+      ' (' + Math.round((res.confidence||0)*100) + '%)';
+    log(res.intent + ' · ' + res.intent + ' in ' + res.latency_ms + ' ms', 'info');
+    (res.tools_used || []).forEach(x => log('tool ' + x));
+    if (res.safety && res.safety.flag) log('safety: ' + res.safety.flag, 'warn');
+    if (res.escalation) log('escalated to ' + res.escalation.level, 'bad');
+    if (res.concern) log('concern → ' + (res.concern.specialty_name || 'unmatched'));
+    if (res.appointment && res.appointment.appointment_code) log('booked ' + res.appointment.appointment_code, 'ok');
+    document.getElementById('state').textContent = JSON.stringify({
+      conversation_id: res.conversation_id, session_id: res.session_id, stage: res.stage,
+      intent: res.intent, patient: res.patient, concern: res.concern, specialty: res.specialty,
+      doctors: (res.doctors||[]).map(d => d.name), slots: (res.slots||[]).map(s => s.label),
+      escalation: res.escalation, safety: res.safety, tools_used: res.tools_used
+    }, null, 2);
+
+    const chips = document.getElementById('chips'); chips.innerHTML = '';
+    (res.quick_replies || []).forEach(c => {
+      const b = document.createElement('button'); b.className = 'chip'; b.textContent = c;
+      b.onclick = () => send(c); chips.appendChild(b);
+    });
+    if ((res.slots || []).length) {
+      picks = res.slots;
+      const wrap = document.createElement('div'); wrap.className = 'chips';
+      res.slots.slice(0,6).forEach(s => {
+        const b = document.createElement('button'); b.className = 'chip';
+        b.textContent = s.label + ' · ₹' + s.fee;
+        b.onclick = () => sendSlot(s); wrap.appendChild(b);
+      });
+      box.appendChild(wrap); box.scrollTop = box.scrollHeight;
+    }
+  } catch (e) {
+    t.remove(); bubble('sys', 'error: ' + e.message);
+  } finally { btn.disabled = false; }
+}
+
+async function sendSlot(slot) {
+  bubble('user', slot.label);
+  const t = bubble('sys', 'holding slot…');
+  try {
+    const res = await api('/ai/chat', {method:'POST', body:{
+      message: 'slot ' + slot.label, conversation_id: conv, selected_slot_id: slot.slot_id}});
+    conv = res.conversation_id; t.remove();
+    bubble('bot', res.reply);
+    document.getElementById('stageBadge').textContent = 'stage: ' + res.stage;
+    const chips = document.getElementById('chips'); chips.innerHTML = '';
+    (res.quick_replies || []).forEach(c => {
+      const b = document.createElement('button'); b.className = 'chip'; b.textContent = c;
+      b.onclick = () => send(c); chips.appendChild(b);
+    });
+  } catch (e) { t.remove(); bubble('sys', 'error: ' + e.message); }
+}
+
+function resetChat() { conv = null; session = null; box.innerHTML = ''; document.getElementById('trace').textContent =
+  'No activity yet.'; bubble('bot', 'New conversation started. How can I help?'); }
+</script>
+{% endblock %}
