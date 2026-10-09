@@ -22,6 +22,7 @@
       type="email"
       placeholder="you@example.com"
       autocomplete="username"
+      spellcheck="false"
     />
 
     <label>Password</label>
@@ -31,7 +32,7 @@
       type="password"
       placeholder="••••••••"
       autocomplete="current-password"
-      onkeydown="if(event.key==='Enter')doLogin()"
+      onkeydown="if(event.key==='Enter') doLogin()"
     />
 
     <div
@@ -42,6 +43,7 @@
       <button
         class="btn"
         id="loginBtn"
+        type="button"
         onclick="doLogin()"
       >
         Sign in
@@ -79,7 +81,7 @@
     <p class="small muted">
       Seeded by
       <code>python -m app.seed</code>.
-      Click to fill the form.
+      Click an account to fill the form.
     </p>
 
     <table>
@@ -117,30 +119,34 @@
 
 <script>
 
+/* =========================================================
+   DEMO ACCOUNTS
+   ========================================================= */
+
 const demos = [
   [
     'SUPER_ADMIN',
-    'superadmin@vijayvargiiyahospital.in',
+    'superadmin@vijayvargiyahospital.in',
     'SuperAdmin@123'
   ],
   [
     'ADMIN',
-    'admin@vijayvargiiyahospital.in',
+    'admin@vijayvargiyahospital.in',
     'Admin@123'
   ],
   [
     'DOCTOR',
-    'dr.arjunmehra@vijayvargiiyahospital.in',
+    'dr.arjunmehra@vijayvargiyahospital.in',
     'Doctor@123'
   ],
   [
     'RECEPTIONIST',
-    'reception@vijayvargiiyahospital.in',
+    'reception@vijayvargiyahospital.in',
     'Reception@123'
   ],
   [
     'ACCOUNTANT',
-    'accounts@vijayvargiiyahospital.in',
+    'accounts@vijayvargiyahospital.in',
     'Accounts@123'
   ],
   [
@@ -150,6 +156,10 @@ const demos = [
   ]
 ];
 
+
+/* =========================================================
+   RENDER DEMO ACCOUNTS
+   ========================================================= */
 
 document.getElementById('demoRows').innerHTML =
   demos.map(([role, email, password]) => `
@@ -170,7 +180,7 @@ document.getElementById('demoRows').innerHTML =
 
         <a
           href="#"
-          onclick="fill('${email}','${password}');return false"
+          onclick="fillDemo(${JSON.stringify(email)}, ${JSON.stringify(password)}); return false;"
         >
           ${password}
         </a>
@@ -182,29 +192,24 @@ document.getElementById('demoRows').innerHTML =
   `).join('');
 
 
-function fill(email, password) {
+/* =========================================================
+   FILL DEMO LOGIN
+   ========================================================= */
+
+function fillDemo(email, password) {
 
   document.getElementById('email').value = email;
-
   document.getElementById('password').value = password;
+
+  document.getElementById('msg').textContent = '';
 
 }
 
 
-/*
- * Store the access token for the existing API client
- * AND create the UI authentication cookie.
- *
- * The cookie allows normal browser navigation to:
- *
- * /ui/patient
- * /ui/doctor
- * /ui/admin
- * /ui/appointments
- * /ui/ai-chat
- *
- * without requiring an Authorization header.
- */
+/* =========================================================
+   UI ACCESS COOKIE
+   ========================================================= */
+
 function saveUIAccessCookie(accessToken) {
 
   if (!accessToken) {
@@ -215,18 +220,25 @@ function saveUIAccessCookie(accessToken) {
     'vvh_access_token=' +
     encodeURIComponent(accessToken) +
     '; Path=/; SameSite=Lax';
+
 }
 
 
-/*
- * Remove UI authentication cookie.
- */
+/* =========================================================
+   CLEAR UI ACCESS COOKIE
+   ========================================================= */
+
 function clearUIAccessCookie() {
 
   document.cookie =
     'vvh_access_token=; Path=/; Max-Age=0; SameSite=Lax';
+
 }
 
+
+/* =========================================================
+   LOGIN
+   ========================================================= */
 
 async function doLogin() {
 
@@ -236,72 +248,220 @@ async function doLogin() {
   const msg =
     document.getElementById('msg');
 
+  const emailInput =
+    document.getElementById('email');
+
+  const passwordInput =
+    document.getElementById('password');
+
+
+  const email =
+    emailInput.value.trim().toLowerCase();
+
+  const password =
+    passwordInput.value;
+
+
+  /* Basic validation */
+
+  if (!email) {
+
+    msg.innerHTML =
+      '<span class="badge bad">' +
+      'Please enter your email.' +
+      '</span>';
+
+    emailInput.focus();
+
+    return;
+  }
+
+
+  if (!password) {
+
+    msg.innerHTML =
+      '<span class="badge bad">' +
+      'Please enter your password.' +
+      '</span>';
+
+    passwordInput.focus();
+
+    return;
+  }
+
+
   btn.disabled = true;
+
+  btn.textContent = 'Signing in...';
 
   msg.textContent = '';
 
 
   try {
 
-    const data = await api(
-      '/auth/login',
-      {
+    /*
+     * Direct API request.
+     *
+     * This is intentionally not using the global api()
+     * helper. The backend endpoint has already been
+     * verified to accept this exact JSON structure.
+     */
+
+    const response =
+      await fetch('/api/v1/auth/login', {
+
         method: 'POST',
 
-        body: {
-          email:
-            document
-              .getElementById('email')
-              .value
-              .trim(),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
 
-          password:
-            document
-              .getElementById('password')
-              .value
+        body: JSON.stringify({
+          email: email,
+          password: password
+        })
+
+      });
+
+
+    /* Read response safely */
+
+    let data = {};
+
+    try {
+      data = await response.json();
+    } catch (_) {
+      data = {};
+    }
+
+
+    /* Login failed */
+
+    if (!response.ok) {
+
+      let errorMessage =
+        data.detail ||
+        data.message ||
+        'Login failed. Please check your email and password.';
+
+
+      /*
+       * FastAPI may return detail as an object/list.
+       * Convert it to readable text.
+       */
+
+      if (typeof errorMessage !== 'string') {
+
+        try {
+
+          errorMessage =
+            JSON.stringify(errorMessage);
+
+        } catch (_) {
+
+          errorMessage =
+            'Login failed.';
+
         }
+
       }
-    );
+
+
+      throw new Error(errorMessage);
+
+    }
+
+
+    /* =====================================================
+       LOGIN SUCCESS
+       ===================================================== */
+
+    if (!data.access_token) {
+
+      throw new Error(
+        'Login succeeded but no access token was returned.'
+      );
+
+    }
+
+
+    if (!data.user) {
+
+      throw new Error(
+        'Login succeeded but user information was not returned.'
+      );
+
+    }
 
 
     /*
      * Existing application authentication.
      */
+
     if (
       typeof Auth !== 'undefined' &&
       Auth &&
       typeof Auth.save === 'function'
     ) {
+
       Auth.save(data);
+
     }
 
 
     /*
-     * New UI authentication bridge.
+     * Browser UI authentication bridge.
      */
+
     saveUIAccessCookie(
       data.access_token
     );
 
 
+    /*
+     * Success message.
+     */
+
+    const fullName =
+      data.user.full_name ||
+      data.user.email ||
+      'User';
+
+
     msg.innerHTML =
       '<span class="badge ok">' +
       'Welcome ' +
-      fmt.esc(data.user.full_name) +
+      escapeHtml(fullName) +
       '</span>';
 
 
-    const role =
-      data.user.role_name;
+    /*
+     * Determine role.
+     */
 
+    const role =
+      String(
+        data.user.role_name || ''
+      ).toUpperCase();
+
+
+    /*
+     * Respect ?next=...
+     */
 
     const next =
       new URLSearchParams(
-        location.search
+        window.location.search
       ).get('next');
 
 
+    /*
+     * Role-based dashboard.
+     */
+
     const home = {
+
       SUPER_ADMIN:
         '/ui/super-admin',
 
@@ -323,30 +483,63 @@ async function doLogin() {
     }[role] || '/ui';
 
 
-    setTimeout(
-      () => {
-        location.href =
-          next || home;
-      },
-      400
+    /*
+     * Redirect after successful login.
+     */
+
+    setTimeout(() => {
+
+      window.location.href =
+        next || home;
+
+    }, 400);
+
+
+  } catch (error) {
+
+    console.error(
+      'Login error:',
+      error
     );
 
 
-  } catch (e) {
-
     msg.innerHTML =
       '<span class="badge bad">' +
-      fmt.esc(
-        e.message ||
+      escapeHtml(
+        error.message ||
         'Login failed'
       ) +
       '</span>';
+
 
   } finally {
 
     btn.disabled = false;
 
+    btn.textContent = 'Sign in';
+
   }
+
+}
+
+
+/* =========================================================
+   SAFE HTML ESCAPE
+   ========================================================= */
+
+function escapeHtml(value) {
+
+  return String(value)
+
+    .replaceAll('&', '&amp;')
+
+    .replaceAll('<', '&lt;')
+
+    .replaceAll('>', '&gt;')
+
+    .replaceAll('"', '&quot;')
+
+    .replaceAll("'", '&#039;');
 
 }
 
