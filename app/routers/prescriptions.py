@@ -106,7 +106,7 @@ def create_prescription(payload: schemas.PrescriptionCreate, request: Request, d
             "patient_name": patient.full_name,
             "code": prescription.prescription_code,
             "doctor_name": doctor.full_name if doctor else "",
-        }, channels=["WHATSAPP", "IN_APP"])
+        }, channels=["WHATSAPP", "EMAIL", "IN_APP"])
 
     audit(db, action="PRESCRIPTION_ISSUE", resource="prescription", resource_id=prescription.id, user=user,
           request=request, new_value={"code": prescription.prescription_code, "patient_id": patient.id,

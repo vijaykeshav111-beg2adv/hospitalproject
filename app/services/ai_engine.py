@@ -1796,7 +1796,7 @@ def handle_message(db: Session, payload, *, user=None) -> dict:
                            message=f"Hello {patient.full_name}, this is a message from Vijay Vargiya "
                                    f"Group of Hospital as requested.", patient_id=patient.id)
         response.update({
-            "reply": "Done - I have sent you a WhatsApp message. Did you want a reminder for a specific "
+            "reply": "Done - I have sent you a notification. Did you want a reminder for a specific "
                      "appointment instead?",
             "quick_replies": ["Remind me about my appointment", "Book appointment"],
         })

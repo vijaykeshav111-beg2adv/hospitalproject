@@ -103,7 +103,7 @@ def request_review(appointment_id: int, request: Request, db: Session = Depends(
         "patient_name": appointment.patient.full_name,
         "doctor_name": doctor.full_name if doctor else "our team",
         "link": "/ui/reviews",
-    }, channels=["WHATSAPP", "IN_APP"], appointment_id=appointment.id)
+    }, channels=["WHATSAPP", "EMAIL", "IN_APP"], appointment_id=appointment.id)
 
     existing = db.scalar(select(models.Review).where(models.Review.appointment_id == appointment_id))
     if not existing:

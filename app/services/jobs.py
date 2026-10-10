@@ -82,7 +82,7 @@ def job_appointment_reminders(db) -> dict:
     for appt in appts:
         context = _appointment_context(appt)
         notify.notify_patient(db, appt.patient, "APPOINTMENT_REMINDER", context,
-                              channels=["WHATSAPP", "IN_APP"], appointment_id=appt.id)
+                              channels=["WHATSAPP", "EMAIL", "IN_APP"], appointment_id=appt.id)
         appt.reminder_sent_at = utcnow()
         sent += 1
     db.commit()
@@ -110,7 +110,7 @@ def job_follow_up_reminders(db) -> dict:
             "patient_name": patient.full_name,
             "doctor_name": doctor.full_name if doctor else "your doctor",
             "date": c.follow_up_date.strftime("%d %b %Y"),
-        }, channels=["WHATSAPP", "IN_APP"])
+        }, channels=["WHATSAPP", "EMAIL", "IN_APP"])
         sent += 1
     return {"follow_ups": sent}
 

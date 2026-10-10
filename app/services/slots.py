@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
@@ -21,6 +22,29 @@ DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
 # --------------------------------------------------------------------------
 def _combine(day: date, value: time) -> datetime:
     return datetime.combine(day, value)
+
+
+def hospital_now() -> datetime:
+    """Return the hospital's local wall-clock time for appointment rules.
+
+    Appointment slot times are stored as local hospital times, while
+    ``utcnow()`` is used for database timestamps and hold expiry.
+    """
+    try:
+        tz = ZoneInfo(getattr(settings, "hospital_timezone", "Asia/Kolkata"))
+    except Exception:  # noqa: BLE001
+        tz = ZoneInfo("Asia/Kolkata")
+    return datetime.now(tz)
+
+
+def slot_has_started(slot: models.Slot, now: datetime | None = None) -> bool:
+    """True when a slot is already in progress or has already passed."""
+    now = now or hospital_now()
+    if slot.slot_date < now.date():
+        return True
+    if slot.slot_date > now.date():
+        return False
+    return slot.start_time <= now.time()
 
 
 def is_holiday(db: Session, day: date) -> models.Holiday | None:
@@ -167,6 +191,7 @@ def available_slots(
     to_date = to_date or (from_date + timedelta(days=14))
 
     now = utcnow()
+    local_now = hospital_now()
     stmt = (
         select(models.Slot, models.Doctor, models.Specialty)
         .join(models.Doctor, models.Doctor.id == models.Slot.doctor_id)
@@ -179,8 +204,8 @@ def available_slots(
             models.Doctor.is_active.is_(True),
             # future days: any open slot; today: only slots that have not started yet
             or_(
-                models.Slot.slot_date > from_date,
-                and_(models.Slot.slot_date == from_date, models.Slot.start_time > now.time()),
+                models.Slot.slot_date > local_now.date(),
+                and_(models.Slot.slot_date == local_now.date(), models.Slot.start_time > local_now.time()),
             ),
         )
         .order_by(models.Slot.slot_date, models.Slot.start_time)
@@ -231,6 +256,8 @@ def hold_slot(
 ) -> models.Slot:
     minutes = minutes or settings.slot_hold_minutes
     now = utcnow()
+    if slot_has_started(slot):
+        raise ValueError("This appointment slot has already started or passed")
     if slot.status == "BOOKED" or slot.booked_count >= slot.capacity:
         raise ValueError("Slot is already booked")
     if slot.status == "HELD" and slot.hold_expires_at and slot.hold_expires_at > now:

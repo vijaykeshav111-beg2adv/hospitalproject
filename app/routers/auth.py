@@ -235,6 +235,32 @@ def register(
 
 
 
+    if payload.role == "PATIENT":
+        notify.notify_patient(
+            db,
+            patient,
+            "WELCOME",
+            {"patient_name": patient.full_name},
+            channels=["WHATSAPP", "EMAIL", "IN_APP"],
+        )
+    else:
+        notify.queue_notification(
+            db,
+            template="CUSTOM",
+            channel="EMAIL",
+            user_id=user.id,
+            subject=f"{settings.app_name} - account created",
+            context={"message": f"Welcome to {settings.app_name}, {user.full_name}. Your account has been created successfully."},
+        )
+        notify.queue_notification(
+            db,
+            template="CUSTOM",
+            channel="IN_APP",
+            user_id=user.id,
+            subject="Account created",
+            context={"message": f"Welcome to {settings.app_name}, {user.full_name}. Your account has been created successfully."},
+        )
+
     tokens = _issue_session(db, user, request)
 
     _login_activity(db, email, "SUCCESS", request, "registration", user.id)

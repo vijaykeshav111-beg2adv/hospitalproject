@@ -69,7 +69,7 @@ def create_payment(payload: schemas.PaymentCreate, request: Request, db: Session
     if payload.notify_patient and payment.status == "PAID":
         notify.notify_patient(db, patient, "PAYMENT_CONFIRMATION",
                               billing.payment_confirmation_context(payment, invoice, patient),
-                              channels=["WHATSAPP", "IN_APP"])
+                              channels=["WHATSAPP", "EMAIL", "IN_APP"])
 
     audit(db, action="PAYMENT_CREATE", resource="payment", resource_id=payment.id, user=user, request=request,
           new_value={"code": payment.payment_code, "amount": float(payment.amount),
@@ -116,11 +116,24 @@ def gateway_callback(payment_id: int, request: Request, status_value: str = "PAI
     if payment.invoice_id:
         invoice = db.get(models.Invoice, payment.invoice_id)
         billing.sync_invoice(db, invoice)
-        if payment.status == "PAID":
-            patient = db.get(models.Patient, payment.patient_id)
+        patient = db.get(models.Patient, payment.patient_id)
+        if patient and payment.status == "PAID":
             notify.notify_patient(db, patient, "PAYMENT_CONFIRMATION",
                                   billing.payment_confirmation_context(payment, invoice, patient),
-                                  channels=["WHATSAPP", "IN_APP"])
+                                  channels=["WHATSAPP", "EMAIL", "IN_APP"])
+        elif patient and payment.status in {"FAILED", "DECLINED", "CANCELLED"}:
+            notify.notify_patient(
+                db,
+                patient,
+                "PAYMENT_FAILED",
+                {
+                    "patient_name": patient.full_name,
+                    "invoice": invoice.invoice_number if invoice else "-",
+                    "amount": f"{float(payment.amount):.2f}",
+                    "reason": payment.failure_reason or "Payment was not completed",
+                },
+                channels=["WHATSAPP", "EMAIL", "IN_APP"],
+            )
     audit(db, action="PAYMENT_GATEWAY_CALLBACK", resource="payment", resource_id=payment_id,
           new_value={"status": payment.status})
     return {"success": True, **_out(db, payment)}
@@ -153,10 +166,18 @@ def refund(payment_id: int, payload: schemas.RefundCreate, request: Request, db:
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     patient = db.get(models.Patient, payment.patient_id)
-    notify.queue_notification(db, template="CUSTOM", channel="WHATSAPP", patient=patient,
-                              context={"message": f"{patient.full_name}, a refund of Rs "
-                                                  f"{float(record.amount):.2f} has been processed against "
-                                                  f"{payment.payment_code}."})
+    notify.notify_patient(
+        db,
+        patient,
+        "REFUND_PROCESSED",
+        {
+            "patient_name": patient.full_name,
+            "amount": f"{float(record.amount):.2f}",
+            "code": payment.payment_code,
+            "reason": payload.reason or "Refund processed",
+        },
+        channels=["WHATSAPP", "EMAIL", "IN_APP"],
+    )
     audit(db, action="PAYMENT_REFUND", resource="payment", resource_id=payment_id, user=user, request=request,
           new_value={"refund_code": record.refund_code, "amount": float(record.amount),
                      "reason": payload.reason})

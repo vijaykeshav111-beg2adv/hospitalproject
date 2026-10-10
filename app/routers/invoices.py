@@ -180,6 +180,6 @@ def send_reminder(invoice_id: int, request: Request, db: Session = Depends(get_d
     notify.notify_patient(db, patient, "PAYMENT_REMINDER", {
         "patient_name": patient.full_name, "amount": f"{float(invoice.balance_amount):.2f}",
         "invoice": invoice.invoice_number,
-    }, channels=["WHATSAPP", "IN_APP"])
+    }, channels=["WHATSAPP", "EMAIL", "IN_APP"])
     audit(db, action="INVOICE_REMIND", resource="invoice", resource_id=invoice_id, user=user, request=request)
     return {"success": True, "message": "Reminder sent", "balance": float(invoice.balance_amount)}

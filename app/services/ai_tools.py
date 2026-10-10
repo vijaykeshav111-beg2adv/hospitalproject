@@ -438,6 +438,13 @@ def book_appointment(
     slot = db.get(models.Slot, slot_id)
     if not slot:
         return {"success": False, "error": "Slot not found"}
+    if slot_service.slot_has_started(slot):
+        alternatives = slot_service.available_slots(db, doctor_id=slot.doctor_id, limit=3)
+        return {
+            "success": False,
+            "error": "That appointment slot has already started or passed",
+            "alternatives": alternatives,
+        }
     if slot.status == "BOOKED" or slot.booked_count >= slot.capacity:
         alternatives = slot_service.available_slots(db, doctor_id=slot.doctor_id, limit=3)
         return {"success": False, "error": "That slot just got booked", "alternatives": alternatives}
@@ -487,7 +494,7 @@ def book_appointment(
             "token": appointment.token_number,
             "fee": f"{float(doctor.consultation_fee or 0):.2f}",
             "code": appointment.appointment_code,
-        }, channels=["WHATSAPP", "IN_APP"], appointment_id=appointment.id)
+        }, channels=["WHATSAPP", "EMAIL", "IN_APP"], appointment_id=appointment.id)
 
     return {
         "success": True,
@@ -530,7 +537,7 @@ def cancel_appointment(db: Session, ctx: ToolContext, appointment_id: int, reaso
         "time": appointment.start_time.strftime("%H:%M"),
         "doctor_name": appointment.doctor.full_name if appointment.doctor else "",
         "reason": appointment.cancellation_reason,
-    }, channels=["WHATSAPP", "IN_APP"], appointment_id=appointment.id)
+    }, channels=["WHATSAPP", "EMAIL", "IN_APP"], appointment_id=appointment.id)
 
     return {
         "success": True,
@@ -589,7 +596,7 @@ def reschedule_appointment(db: Session, ctx: ToolContext, appointment_id: int, n
         "time": appointment.start_time.strftime("%H:%M"),
         "doctor_name": doctor.full_name if doctor else "",
         "code": appointment.appointment_code,
-    }, channels=["WHATSAPP", "IN_APP"], appointment_id=appointment.id)
+    }, channels=["WHATSAPP", "EMAIL", "IN_APP"], appointment_id=appointment.id)
 
     return {
         "success": True,
@@ -685,7 +692,7 @@ def send_notification(db: Session, ctx: ToolContext, template: str = "CUSTOM", m
         ctx_data["message"] = message
     notif = notify.notify_patient(
         db, patient, template, ctx_data,
-        channels=[channel, "IN_APP"] if channel != "IN_APP" else ["IN_APP"],
+        channels=( ["WHATSAPP", "EMAIL", "IN_APP"] if channel == "WHATSAPP" else (["EMAIL", "IN_APP"] if channel == "EMAIL" else ["IN_APP"]) ),
     )
     return {
         "success": True,

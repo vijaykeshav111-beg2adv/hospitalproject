@@ -192,7 +192,7 @@ def complete_consultation(consultation_id: int, request: Request, db: Session = 
                 "patient_name": patient.full_name,
                 "doctor_name": doctor.full_name if doctor else "your doctor",
                 "date": consultation.follow_up_date.strftime("%d %b %Y"),
-            }, channels=["WHATSAPP", "IN_APP"])
+            }, channels=["WHATSAPP", "EMAIL", "IN_APP"])
     audit(db, action="CONSULTATION_COMPLETE", resource="consultation", resource_id=consultation_id,
           user=user, request=request, new_value={"status": "COMPLETED"})
     return _out(db, consultation)

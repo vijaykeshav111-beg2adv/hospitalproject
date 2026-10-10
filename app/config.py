@@ -146,6 +146,7 @@ class Settings:
     smtp_user: str = os.getenv("SMTP_USER", "")
     smtp_password: str = os.getenv("SMTP_PASSWORD", "")
     email_from: str = os.getenv("EMAIL_FROM", "no-reply@vijayvargiyahospital.in")
+    hospital_timezone: str = os.getenv("HOSPITAL_TIMEZONE", "Asia/Kolkata")
 
     # --- AI: Groq only ---
     ai_provider: str = "groq"

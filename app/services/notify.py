@@ -47,6 +47,22 @@ TEMPLATES: dict[str, str] = {
         "Payment received - {patient_name}.\nInvoice: {invoice}\nAmount: Rs {amount}\n"
         "Method: {method}\nReceipt: {code}\nThank you!"
     ),
+    "PAYMENT_FAILED": (
+        "Hello {patient_name}, your payment for invoice {invoice} could not be completed. "
+        "Amount: Rs {amount}. Reason: {reason}. Please try again or contact the hospital."
+    ),
+    "INVOICE_GENERATED": (
+        "Hello {patient_name}, your hospital invoice {invoice} has been generated. "
+        "Total: Rs {amount}. Due date: {due_date}. Status: {status}."
+    ),
+    "REFUND_PROCESSED": (
+        "Hello {patient_name}, a refund of Rs {amount} has been processed against "
+        "payment {code}. Reason: {reason}."
+    ),
+    "WELCOME": (
+        "Welcome to {hospital}, {patient_name}! Your account has been created successfully. "
+        "You can now use the patient portal to manage appointments, prescriptions, invoices and medical records."
+    ),
     "PAYMENT_REMINDER": (
         "{patient_name}, a gentle reminder: Rs {amount} is pending on invoice {invoice}. "
         "Pay at the reception desk or via the patient portal."

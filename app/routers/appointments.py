@@ -329,6 +329,12 @@ def create_appointment(
         start_time = slot.start_time
         end_time = slot.end_time
 
+        if slot_service.slot_has_started(slot):
+            raise HTTPException(
+                status_code=409,
+                detail="Cannot book an appointment slot that has already started or passed",
+            )
+
     else:
         doctor = (
             db.get(
@@ -367,6 +373,16 @@ def create_appointment(
             )
             + timedelta(minutes=duration)
         ).time()
+
+        # Appointment times are hospital-local (Asia/Kolkata by default).
+        if appt_date < slot_service.hospital_now().date() or (
+            appt_date == slot_service.hospital_now().date()
+            and start_time <= slot_service.hospital_now().time()
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Cannot book an appointment time that has already started or passed",
+            )
 
     # ---------------------------------------------------------
     # 3. Validate doctor
@@ -696,6 +712,12 @@ def reschedule(
         raise HTTPException(
             status_code=404,
             detail="New slot not found",
+        )
+
+    if slot_service.slot_has_started(new_slot):
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot reschedule to an appointment slot that has already started or passed",
         )
 
     if (

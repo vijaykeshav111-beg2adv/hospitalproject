@@ -81,7 +81,7 @@ def _notify_affected_patients(db: Session, leave: models.DoctorLeave) -> int:
             "time": appt.start_time.strftime("%H:%M"),
             "doctor_name": doctor.full_name if doctor else "",
             "reason": f"doctor on {leave.leave_type} leave",
-        }, channels=["WHATSAPP", "IN_APP"], appointment_id=appt.id)
+        }, channels=["WHATSAPP", "EMAIL", "IN_APP"], appointment_id=appt.id)
     return len(appointments)
 
 

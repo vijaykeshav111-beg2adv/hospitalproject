@@ -194,10 +194,26 @@ def create_invoice(
     db.commit()
     db.refresh(invoice)
 
-    return sync_invoice(
+    invoice = sync_invoice(
         db,
         invoice,
     )
+
+    notify.notify_patient(
+        db,
+        patient,
+        "INVOICE_GENERATED",
+        {
+            "patient_name": patient.full_name,
+            "invoice": invoice.invoice_number,
+            "amount": f"{float(invoice.total_amount):.2f}",
+            "due_date": invoice.due_date.strftime("%d %b %Y") if invoice.due_date else "-",
+            "status": invoice.status,
+        },
+        channels=["WHATSAPP", "EMAIL", "IN_APP"],
+    )
+
+    return invoice
 
 
 def invoice_for_appointment(

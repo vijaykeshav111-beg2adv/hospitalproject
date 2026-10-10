@@ -155,10 +155,14 @@ def call_next(doctor_id: int, request: Request, db: Session = Depends(get_db),
     db.commit()
     patient = db.get(models.Patient, appointment.patient_id)
     if patient:
-        notify.queue_notification(
-            db, template="CUSTOM", channel="WHATSAPP", patient=patient,
-            context={"message": f"{patient.full_name}, it is your turn now. Please proceed to the "
-                                f"doctor's room. Token {appointment.token_number}."},
+        notify.notify_patient(
+            db,
+            patient,
+            "CUSTOM",
+            {"message": f"{patient.full_name}, it is your turn now. Please proceed to the "
+                         f"doctor's room. Token {appointment.token_number}."},
+            channels=["WHATSAPP", "EMAIL", "IN_APP"],
+            appointment_id=appointment.id,
         )
     audit(db, action="QUEUE_CALL_NEXT", resource="appointment", resource_id=appointment.id, user=user,
           request=request)
