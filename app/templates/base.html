@@ -1,144 +1,404 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-layout="public">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="theme-color" content="#2f5bea"/>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <title>{% block title %}{{ app_name }}{% endblock %} | {{ app_name }}</title>
+<script>
+/* Decide layout BEFORE first paint (no flash): public site chrome for marketing/auth pages
+   and for signed-out visitors, app chrome (sidebar) for signed-in users on portal pages. */
+(function () {
+  var publicPage = {{ 'true' if page in ['home','login','register','forgot','reset'] else 'false' }};
+  var token = null;
+  try { token = window.localStorage.getItem('vvh_token'); } catch (e) {}
+  document.documentElement.setAttribute('data-layout', (publicPage || !token) ? 'public' : 'app');
+})();
+</script>
 <style>
+/* =====================================================================
+   DESIGN SYSTEM  -  Vijay Vargiya Group of Hospitals
+   Blue + teal, soft surfaces, rounded cards.  Class names are unchanged
+   so every existing page keeps working.
+   ===================================================================== */
 :root{
-  --bg:#f4f7f6; --panel:#ffffff; --panel-2:#fbfdfc; --ink:#12211f; --muted:#607875;
-  --brand:#0e7c6b; --brand-2:#12a08a; --brand-soft:#e6f4f1; --accent:#f4a259;
-  --danger:#d64545; --warn:#d99414; --ok:#1f9d55; --line:#e2ebe8;
-  --shadow:0 1px 2px rgba(16,40,36,.06),0 8px 24px rgba(16,40,36,.06);
-  --radius:14px;
+  --bg:#f3f6fd; --panel:#ffffff; --panel-2:#f7f9ff; --ink:#0f1b3d; --ink-2:#26335c; --muted:#64748b;
+  --brand:#2f5bea; --brand-2:#4f7bff; --brand-dark:#1f43c4; --brand-soft:#eaf0ff;
+  --teal:#0fb5a6; --teal-soft:#e2f8f5; --violet:#7c5cf0; --violet-soft:#f0ecff;
+  --accent:#f59e0b; --danger:#e5484d; --warn:#d98a0b; --ok:#16a34a; --line:#e5eaf5;
+  --grad:linear-gradient(135deg,#2f5bea 0%,#4f7bff 55%,#0fb5a6 130%);
+  --grad-soft:linear-gradient(135deg,#eaf0ff 0%,#e2f8f5 100%);
+  --shadow-sm:0 1px 2px rgba(15,27,61,.05);
+  --shadow:0 1px 2px rgba(15,27,61,.04),0 10px 30px rgba(47,91,234,.07);
+  --shadow-lg:0 20px 50px rgba(47,91,234,.16);
+  --radius:18px; --radius-sm:12px;
+  --font:"Plus Jakarta Sans","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --side-w:268px;
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);
-  font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;font-size:15px;line-height:1.5}
+html{scroll-behavior:smooth;scroll-padding-top:90px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.55;
+  -webkit-font-smoothing:antialiased}
 a{color:var(--brand);text-decoration:none}
 a:hover{text-decoration:underline}
-.wrap{max-width:1240px;margin:0 auto;padding:0 18px}
-header.top{background:linear-gradient(120deg,#0b5f52,#0e7c6b 55%,#12a08a);color:#fff;
-  box-shadow:var(--shadow);position:sticky;top:0;z-index:20}
-.top .bar{display:flex;align-items:center;gap:14px;padding:12px 0;flex-wrap:wrap}
-.brand{display:flex;align-items:center;gap:11px;font-weight:700;letter-spacing:.2px}
-.brand .logo{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,.16);
-  display:grid;place-items:center;font-size:19px;border:1px solid rgba(255,255,255,.25)}
-.brand small{display:block;font-weight:400;font-size:11.5px;opacity:.85;letter-spacing:.4px}
-nav.menu{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
-nav.menu a{color:#eafaf6;padding:8px 11px;border-radius:9px;font-size:13.5px;font-weight:600}
-nav.menu a:hover,nav.menu a.on{background:rgba(255,255,255,.16);text-decoration:none}
-.who{display:flex;align-items:center;gap:8px;font-size:12.5px;background:rgba(255,255,255,.13);
-  padding:6px 10px;border-radius:999px}
-.dot{width:8px;height:8px;border-radius:50%;background:#8ef0c9}
-main{padding:22px 0 60px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);
-  padding:18px;margin-bottom:16px}
-.card h2,.card h3{margin:0 0 12px;font-size:17px;letter-spacing:.1px}
-.card h3.sub{margin-top:18px}
-.grid{display:grid;gap:14px}
-.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
-.g3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
-.g4{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
-.kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 15px;
-  box-shadow:var(--shadow);position:relative;overflow:hidden}
-.kpi:before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--brand-2)}
-.kpi .lbl{font-size:11.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:700}
-.kpi .val{font-size:24px;font-weight:800;margin-top:5px}
-.kpi .hint{font-size:12px;color:var(--muted);margin-top:3px}
-.kpi.warn:before{background:var(--warn)} .kpi.bad:before{background:var(--danger)}
-.kpi.good:before{background:var(--ok)} .kpi.alt:before{background:var(--accent)}
-table{width:100%;border-collapse:collapse;font-size:13.6px}
-th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
-th{font-size:11.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);background:var(--panel-2)}
-tbody tr:hover{background:#f6fbfa}
-input,select,textarea{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:10px;
-  font:inherit;background:#fff;color:var(--ink)}
-input:focus,select:focus,textarea:focus{outline:2px solid var(--brand-soft);border-color:var(--brand-2)}
-label{display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin:10px 0 4px;
-  text-transform:uppercase;letter-spacing:.4px}
-.btn{display:inline-flex;align-items:center;gap:7px;background:var(--brand);color:#fff;border:0;
-  padding:10px 15px;border-radius:10px;font-weight:700;font-size:13.6px;cursor:pointer;transition:.15s}
-.btn:hover{background:#0b6b5c}
-.btn.ghost{background:var(--brand-soft);color:var(--brand)}
-.btn.ghost:hover{background:#d6ece7}
-.btn.warn{background:var(--warn)} .btn.bad{background:var(--danger)} .btn.dark{background:#22343a}
-.btn.sm{padding:6px 10px;font-size:12.5px}
-.btn:disabled{opacity:.55;cursor:not-allowed}
-.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:800;
-  letter-spacing:.3px;background:#eef3f2;color:#40605c}
-.badge.ok{background:#e3f7ec;color:#14663a} .badge.warn{background:#fdf1dc;color:#8a5b0a}
-.badge.bad{background:#fdeaea;color:#952323} .badge.info{background:var(--brand-soft);color:#0a5b4f}
-.badge.mute{background:#eef1f1;color:#6a7b78}
-.muted{color:var(--muted)} .small{font-size:12.5px} .right{text-align:right} .center{text-align:center}
-.pill{padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:12.5px}
-.pill.on{background:var(--brand);color:#fff;border-color:var(--brand)}
-.chat{display:flex;flex-direction:column;gap:10px;max-height:60vh;overflow:auto;padding:6px 2px}
-.msg{max-width:78%;padding:11px 13px;border-radius:14px;white-space:pre-wrap;font-size:14px}
-.msg.user{align-self:flex-end;background:var(--brand);color:#fff;border-bottom-right-radius:4px}
-.msg.bot{align-self:flex-start;background:#f2f7f6;border:1px solid var(--line);border-bottom-left-radius:4px}
-.msg.sys{align-self:center;background:#fff7e8;border:1px dashed var(--warn);font-size:12.5px;color:#7a5406}
-.chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
-.chip{background:var(--brand-soft);color:#0a5b4f;border:1px solid #cfe7e2;border-radius:999px;
-  padding:6px 12px;cursor:pointer;font-size:12.6px;font-weight:600}
-.chip:hover{background:#d6ece7}
-.timeline{border-left:2px solid var(--line);margin-left:8px;padding-left:16px}
-.timeline .t{position:relative;padding:0 0 14px}
-.timeline .t:before{content:"";position:absolute;left:-23px;top:5px;width:9px;height:9px;border-radius:50%;
-  background:var(--brand-2);box-shadow:0 0 0 3px #e6f4f1}
-.tabs{display:flex;gap:5px;border-bottom:1px solid var(--line);margin-bottom:14px;flex-wrap:wrap}
-.tabs button{background:none;border:0;padding:10px 12px;font:inherit;font-weight:700;color:var(--muted);
-  cursor:pointer;border-bottom:3px solid transparent}
-.tabs button.on{color:var(--brand);border-color:var(--brand)}
+h1,h2,h3,h4{letter-spacing:-.01em}
+code{background:var(--brand-soft);color:var(--brand-dark);padding:2px 6px;border-radius:6px;font-size:.88em}
+.wrap{max-width:1200px;margin:0 auto;padding:0 24px}
 .hide{display:none!important}
-.toast{position:fixed;right:16px;bottom:16px;z-index:60;display:flex;flex-direction:column;gap:8px}
-.toast div{background:#12211f;color:#fff;padding:11px 14px;border-radius:11px;font-size:13.4px;
-  box-shadow:var(--shadow);max-width:340px}
-.toast div.ok{background:#14663a} .toast div.err{background:#952323} .toast div.warn{background:#8a5b0a}
-.hero{background:radial-gradient(1000px 400px at 12% -10%,#12a08a33,transparent),
-  linear-gradient(135deg,#0b5f52,#0e7c6b);color:#fff;border-radius:20px;padding:34px;box-shadow:var(--shadow)}
-.hero h1{margin:0 0 10px;font-size:32px;line-height:1.2}
-.hero p{margin:0;opacity:.92;max-width:720px}
-.hero .cta{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
-.hero .btn{background:#fff;color:#0b5f52} .hero .btn.ghost{background:rgba(255,255,255,.16);color:#fff}
-.statline{display:flex;gap:26px;margin-top:22px;flex-wrap:wrap}
-.statline div span{display:block;font-size:24px;font-weight:800}
+
+/* ------------------------------ layout shell ------------------------------ */
+.shell{display:flex;min-height:100vh}
+.content-col{flex:1;min-width:0;display:flex;flex-direction:column}
+main{flex:1;padding:8px 0 56px}
+main.wrap{width:100%}
+html[data-layout=public] .sidebar,
+html[data-layout=public] .topbar,
+html[data-layout=public] .app-foot,
+html[data-layout=public] .scrim{display:none!important}
+html[data-layout=app] .pubnav,
+html[data-layout=app] .pub-foot{display:none!important}
+html[data-layout=public] main{padding-top:28px}
+html[data-layout=app] main.wrap{max-width:1380px;width:100%;padding:6px 30px 56px}
+
+/* ------------------------------ sidebar (app) ------------------------------ */
+.sidebar{width:var(--side-w);flex:none;background:#fff;border-right:1px solid var(--line);position:sticky;top:0;
+  height:100vh;display:flex;flex-direction:column;padding:20px 14px 16px;overflow-y:auto;z-index:60}
+.brand{display:flex;align-items:center;gap:11px;color:var(--ink);font-weight:800;line-height:1.15}
+.brand:hover{text-decoration:none}
+.brand .logo{width:40px;height:40px;border-radius:13px;background:var(--grad);display:grid;place-items:center;
+  box-shadow:0 8px 18px rgba(47,91,234,.32);flex:none}
+.brand .logo svg{width:22px;height:22px}
+.brand small{display:block;font-weight:600;font-size:11px;color:var(--muted);letter-spacing:.3px;margin-top:2px}
+.brand .bn{font-size:14.5px}
+.side-brand{padding:2px 8px 18px}
+.nav-label{font-size:10.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:#94a3b8;margin:16px 12px 6px}
+nav.side{display:flex;flex-direction:column;gap:2px}
+.side-link{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;color:var(--ink-2);
+  font-weight:600;font-size:14px;transition:.15s}
+.side-link svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none;opacity:.8}
+.side-link:hover{background:var(--panel-2);text-decoration:none;color:var(--brand)}
+.side-link.on{background:var(--brand-soft);color:var(--brand)}
+.side-link.on svg{opacity:1}
+.side-grow{flex:1;min-height:14px}
+.side-promo{background:var(--grad);color:#fff;border-radius:16px;padding:16px;position:relative;overflow:hidden;margin:14px 0 10px}
+.side-promo:before{content:"";position:absolute;right:-30px;top:-30px;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.14)}
+.side-promo b{display:block;font-size:14px;margin-bottom:4px;position:relative}
+.side-promo p{margin:0 0 12px;font-size:12px;opacity:.92;position:relative}
+.side-promo a{display:inline-block;background:#fff;color:var(--brand-dark);font-weight:800;font-size:12.5px;padding:7px 12px;border-radius:10px;position:relative}
+.side-promo a:hover{text-decoration:none;transform:translateY(-1px)}
+.side-logout{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;color:var(--danger);font-weight:700;font-size:13.5px}
+.side-logout:hover{background:#fdeeee;text-decoration:none}
+.side-logout svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+
+/* ------------------------------ topbar (app) ------------------------------ */
+.topbar{position:sticky;top:0;z-index:40;background:rgba(243,246,253,.85);backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);display:flex;align-items:center;gap:14px;padding:16px 30px}
+.topbar .ttl{min-width:0}
+.topbar .hello{font-size:12.5px;color:var(--muted);font-weight:600}
+.topbar h1{margin:0;font-size:22px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.date-chip{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:12px;
+  padding:8px 12px;font-size:12.5px;font-weight:700;color:var(--ink-2);box-shadow:var(--shadow-sm)}
+.date-chip svg{width:16px;height:16px;stroke:var(--brand);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.who{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:14px;
+  padding:5px 12px 5px 5px;box-shadow:var(--shadow-sm)}
+.avatar{width:34px;height:34px;border-radius:11px;background:var(--grad);color:#fff;display:grid;place-items:center;
+  font-weight:800;font-size:13px;flex:none}
+.who .nm{font-size:13px;font-weight:800;line-height:1.15}
+.who .rl{font-size:11px;color:var(--muted);font-weight:600;text-transform:capitalize}
+.dot{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 3px #dcfce7;display:inline-block}
+.menu-btn{display:none;width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:#fff;cursor:pointer;
+  place-items:center}
+.menu-btn svg{width:20px;height:20px;stroke:var(--ink);fill:none;stroke-width:2;stroke-linecap:round}
+.scrim{display:none}
+
+/* ------------------------------ public navbar ------------------------------ */
+.pubnav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.86);backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.pubnav .bar{display:flex;align-items:center;gap:22px;height:70px}
+.pub-links{display:flex;gap:4px;margin-left:18px}
+.pub-links a{color:var(--ink-2);font-weight:600;font-size:14px;padding:8px 13px;border-radius:10px}
+.pub-links a:hover,.pub-links a.on{background:var(--brand-soft);color:var(--brand);text-decoration:none}
+.pub-auth{margin-left:auto;display:flex;align-items:center;gap:10px}
+.pub-toggle{display:none;margin-left:auto;width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:#fff;cursor:pointer;place-items:center}
+.pub-toggle svg{width:20px;height:20px;stroke:var(--ink);fill:none;stroke-width:2;stroke-linecap:round}
+
+/* ------------------------------ cards, grid, kpi ------------------------------ */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);
+  padding:22px;margin-bottom:18px}
+.card h2,.card h3{margin:0 0 14px;font-size:17px;font-weight:800}
+.card h3.sub{margin-top:20px}
+main>h2,main>.wrap>h2{font-size:24px;font-weight:800;margin:6px 0 4px}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.kpi{--k:var(--brand);background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px 18px 16px;
+  box-shadow:var(--shadow);position:relative;overflow:hidden;transition:.2s}
+.kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.kpi:before{content:"";position:absolute;right:-26px;top:-26px;width:100px;height:100px;border-radius:50%;background:var(--k);opacity:.10}
+.kpi:after{content:"";position:absolute;right:16px;top:16px;width:10px;height:10px;border-radius:50%;background:var(--k)}
+.kpi .lbl{font-size:11.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-weight:800}
+.kpi .val{font-size:28px;font-weight:800;margin-top:6px;letter-spacing:-.02em}
+.kpi .hint{font-size:12.3px;color:var(--muted);margin-top:3px}
+.kpi.warn{--k:var(--accent)} .kpi.bad{--k:var(--danger)} .kpi.good{--k:var(--ok)} .kpi.alt{--k:var(--teal)}
+
+/* ------------------------------ tables ------------------------------ */
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:13.8px}
+th,td{padding:12px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:11.3px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);background:var(--panel-2);font-weight:800}
+th:first-child{border-top-left-radius:12px} th:last-child{border-top-right-radius:12px}
+tbody tr{transition:.12s}
+tbody tr:hover{background:#f5f8ff}
+tbody tr:last-child td{border-bottom:0}
+
+/* ------------------------------ forms ------------------------------ */
+input,select,textarea{width:100%;padding:11px 13px;border:1.5px solid var(--line);border-radius:12px;font:inherit;
+  background:#fff;color:var(--ink);transition:.15s}
+input::placeholder,textarea::placeholder{color:#a3aec2}
+input:focus,select:focus,textarea:focus{outline:0;border-color:var(--brand-2);box-shadow:0 0 0 4px rgba(79,123,255,.16)}
+input[type=checkbox],input[type=radio]{width:auto;accent-color:var(--brand)}
+label{display:block;font-size:12px;font-weight:800;color:var(--muted);margin:12px 0 5px;text-transform:uppercase;letter-spacing:.5px}
+
+/* ------------------------------ buttons ------------------------------ */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--grad);color:#fff;border:0;
+  padding:11px 18px;border-radius:12px;font:inherit;font-weight:700;font-size:13.8px;cursor:pointer;transition:.18s;
+  box-shadow:0 6px 16px rgba(47,91,234,.25)}
+.btn:hover{transform:translateY(-1px);box-shadow:0 10px 22px rgba(47,91,234,.32);text-decoration:none;color:#fff}
+.btn:active{transform:translateY(0)}
+.btn.ghost{background:var(--brand-soft);color:var(--brand);box-shadow:none}
+.btn.ghost:hover{background:#dce6ff;color:var(--brand-dark);box-shadow:none}
+.btn.warn{background:var(--accent);box-shadow:0 6px 16px rgba(245,158,11,.28)}
+.btn.bad{background:var(--danger);box-shadow:0 6px 16px rgba(229,72,77,.28)}
+.btn.dark{background:#1b2a52;box-shadow:none}
+.btn.outline{background:#fff;color:var(--brand);border:1.5px solid #cdd9ff;box-shadow:none}
+.btn.outline:hover{background:var(--brand-soft);color:var(--brand-dark);box-shadow:none}
+.btn.lg{padding:14px 24px;font-size:15px;border-radius:14px}
+.btn.sm{padding:7px 12px;font-size:12.6px;border-radius:10px}
+.btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+/* ------------------------------ badges, pills, tabs ------------------------------ */
+.badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:800;
+  letter-spacing:.2px;background:#eef2fa;color:#4a5b7a}
+.badge:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.75}
+.badge.ok{background:#e1f6e9;color:#14793d} .badge.warn{background:#fdf1d9;color:#935f06}
+.badge.bad{background:#fde8e9;color:#a82a2f} .badge.info{background:var(--brand-soft);color:var(--brand-dark)}
+.badge.mute{background:#eef1f6;color:#6b7a93}
+.muted{color:var(--muted)} .small{font-size:12.8px} .right{text-align:right} .center{text-align:center}
+.pill{padding:7px 13px;border-radius:999px;border:1.5px solid var(--line);background:#fff;cursor:pointer;font-size:12.8px;font-weight:600;transition:.15s}
+.pill:hover{border-color:var(--brand-2);color:var(--brand)}
+.pill.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px;flex-wrap:wrap}
+.tabs button{background:none;border:0;padding:11px 14px;font:inherit;font-weight:700;color:var(--muted);cursor:pointer;
+  border-bottom:3px solid transparent;border-radius:8px 8px 0 0}
+.tabs button:hover{color:var(--brand)}
+.tabs button.on{color:var(--brand);border-color:var(--brand)}
+
+/* ------------------------------ chat ------------------------------ */
+.chat{display:flex;flex-direction:column;gap:10px;max-height:60vh;overflow:auto;padding:8px 4px;scroll-behavior:smooth}
+.msg{max-width:80%;padding:12px 15px;border-radius:18px;white-space:pre-wrap;font-size:14px;line-height:1.5}
+.msg.user{align-self:flex-end;background:var(--grad);color:#fff;border-bottom-right-radius:5px;box-shadow:0 6px 14px rgba(47,91,234,.22)}
+.msg.bot{align-self:flex-start;background:#fff;border:1px solid var(--line);border-bottom-left-radius:5px;box-shadow:var(--shadow-sm)}
+.msg.sys{align-self:center;background:#fff8e8;border:1px dashed #e8b64f;font-size:12.5px;color:#7a5406;border-radius:12px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.chip{background:var(--brand-soft);color:var(--brand-dark);border:1px solid #d3dfff;border-radius:999px;padding:7px 14px;
+  cursor:pointer;font:inherit;font-size:12.8px;font-weight:700;transition:.15s}
+.chip:hover{background:var(--brand);color:#fff;border-color:var(--brand)}
+
+/* ------------------------------ misc ------------------------------ */
+.timeline{border-left:2px solid var(--line);margin-left:8px;padding-left:18px}
+.timeline .t{position:relative;padding:0 0 16px}
+.timeline .t:before{content:"";position:absolute;left:-25px;top:5px;width:10px;height:10px;border-radius:50%;
+  background:var(--brand);box-shadow:0 0 0 4px var(--brand-soft)}
+.toast{position:fixed;right:18px;bottom:18px;z-index:90;display:flex;flex-direction:column;gap:8px}
+.toast div{background:#14204a;color:#fff;padding:12px 16px;border-radius:14px;font-size:13.5px;font-weight:600;
+  box-shadow:var(--shadow-lg);max-width:360px;animation:tin .25s ease}
+.toast div.ok{background:#14793d} .toast div.err{background:#a82a2f} .toast div.warn{background:#935f06}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .chart{width:100%;height:190px}
-footer{border-top:1px solid var(--line);padding:18px 0 34px;color:var(--muted);font-size:12.6px}
 .flex-between{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-.modal{position:fixed;inset:0;background:rgba(10,25,23,.5);display:grid;place-items:center;z-index:50;padding:16px}
-.modal .box{background:#fff;border-radius:16px;padding:20px;max-width:560px;width:100%;max-height:86vh;overflow:auto}
-@media(max-width:720px){.hero{padding:22px}.hero h1{font-size:25px}nav.menu{width:100%;margin-left:0}}
+.modal{position:fixed;inset:0;background:rgba(15,27,61,.5);backdrop-filter:blur(3px);display:grid;place-items:center;z-index:80;padding:16px}
+.modal .box{background:#fff;border-radius:22px;padding:24px;max-width:580px;width:100%;max-height:86vh;overflow:auto;box-shadow:var(--shadow-lg)}
+
+/* ------------------------------ footers ------------------------------ */
+.app-foot{padding:16px 30px 28px;color:var(--muted);font-size:12.5px}
+.pub-foot{background:#0f1b3d;color:#c3cde6;margin-top:30px}
+.pub-foot .cols{display:grid;grid-template-columns:1.6fr 1fr 1fr 1.2fr;gap:36px;padding:54px 0 34px}
+.pub-foot .brand{color:#fff}
+.pub-foot .brand small{color:#8e9cc4}
+.pub-foot p{font-size:13.5px;line-height:1.7;margin:14px 0 0;color:#9eacd0;max-width:340px}
+.pub-foot h4{color:#fff;margin:0 0 14px;font-size:14px}
+.pub-foot ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px;font-size:13.5px}
+.pub-foot a{color:#c3cde6}
+.pub-foot a:hover{color:#fff;text-decoration:none}
+.pub-foot .legal{border-top:1px solid #243566;padding:18px 0 26px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:12.5px;color:#8e9cc4}
+
+/* ------------------------------ responsive ------------------------------ */
+@media(max-width:1020px){
+  html[data-layout=app] .sidebar{position:fixed;left:0;top:0;transform:translateX(-102%);transition:transform .25s ease;box-shadow:var(--shadow-lg)}
+  html[data-layout=app] body.nav-open .sidebar{transform:none}
+  html[data-layout=app] body.nav-open .scrim{display:block;position:fixed;inset:0;background:rgba(15,27,61,.45);z-index:55}
+  .menu-btn{display:grid}
+  .topbar{padding:12px 16px}
+  html[data-layout=app] main.wrap{padding:4px 16px 44px}
+  .date-chip{display:none}
+  .app-foot{padding:14px 16px 26px}
+}
+@media(max-width:860px){
+  .pub-toggle{display:grid}
+  .pub-links,.pub-auth{display:none}
+  .pubnav.open .bar{flex-wrap:wrap;height:auto;padding:12px 0}
+  .pubnav.open .pub-links,.pubnav.open .pub-auth{display:flex;width:100%;margin:0;flex-direction:column;align-items:stretch}
+  .pubnav.open .pub-auth .btn{width:100%}
+  .pub-foot .cols{grid-template-columns:1fr 1fr;gap:28px}
+}
+@media(max-width:720px){
+  .wrap{padding:0 16px}
+  .card{padding:16px;overflow-x:auto}
+  .who .nm,.who .rl{display:none}.who{padding:5px}
+  .topbar h1{font-size:18px}
+  .pub-foot .cols{grid-template-columns:1fr}
+}
 </style>
 {% block head %}{% endblock %}
 </head>
 <body>
-<header class="top">
-  <div class="wrap bar">
-    <a href="/ui" class="brand" style="color:#fff;text-decoration:none">
-      <span class="logo">✚</span>
-      <span>Vijay Vargiya Group of Hospitals
-        <small>Multi-speciality hospital &middot; Jaipur</small>
+<div class="shell">
+
+  <!-- ============ APP SIDEBAR (signed-in portal pages) ============ -->
+  <aside class="sidebar" id="sidebar">
+    <a href="/ui" class="brand side-brand">
+      <span class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
       </span>
+      <span><span class="bn">Vijay Vargiya</span><small>Group of Hospitals</small></span>
     </a>
-    <nav class="menu" id="nav"></nav>
-    <div class="who" id="whoami" style="display:none">
-      <span class="dot"></span><span id="whoName">-</span><span id="whoRole" class="muted"></span>
-      <a href="#" id="logoutLink" style="color:#fff;font-weight:700">Logout</a>
+    <nav class="side" id="nav"></nav>
+    <div class="side-grow"></div>
+    <div class="side-promo">
+      <b>Need a hand?</b>
+      <p>The AI front desk can find a doctor and book a slot in under a minute.</p>
+      <a href="/ui/ai-chat">Ask the assistant</a>
     </div>
-  </div>
-</header>
-<main class="wrap">
+    <a href="#" class="side-logout" id="logoutLink">
+      <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+      Logout
+    </a>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="content-col">
+
+    <!-- ============ APP TOPBAR ============ -->
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn" aria-label="Open menu">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+      </button>
+      <div class="ttl">
+        <div class="hello" id="helloLine">Welcome back</div>
+        <h1 id="pageTitle">{{ app_name }}</h1>
+      </div>
+      <div class="top-right">
+        <div class="date-chip">
+          <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+          <span id="todayChip"></span>
+        </div>
+        <div class="who" id="whoami">
+          <span class="avatar" id="whoAvatar">U</span>
+          <div><div class="nm" id="whoName">-</div><div class="rl" id="whoRole"></div></div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ============ PUBLIC NAVBAR ============ -->
+    <header class="pubnav" id="pubnav">
+      <div class="wrap bar">
+        <a href="/ui" class="brand">
+          <span class="logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          </span>
+          <span><span class="bn">Vijay Vargiya</span><small>Group of Hospitals &middot; Jaipur</small></span>
+        </a>
+        <nav class="pub-links" id="pubLinks">
+          <a href="/ui">Home</a>
+          <a href="/ui#departments">Departments</a>
+          <a href="/ui#doctors">Doctors</a>
+          <a href="/ui#how">How it works</a>
+          <a href="/ui/ai-chat">AI assistant</a>
+        </nav>
+        <div class="pub-auth" id="pubAuth"></div>
+        <button class="pub-toggle" id="pubToggle" aria-label="Menu">
+          <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="wrap">
 {% block content %}{% endblock %}
-</main>
-<footer class="wrap">
-  <div class="flex-between">
-    <span>&copy; {{ app_name }} &middot; FastAPI + MySQL hospital management platform</span>
-    <span><a href="/docs">API docs</a> &middot; <a href="/ui/ai-chat">AI assistant</a> &middot; env: {{ env }}</span>
+    </main>
+
+    <!-- ============ FOOTERS ============ -->
+    <footer class="app-foot">
+      <div class="flex-between">
+        <span>&copy; {{ app_name }} &middot; Hospital management platform</span>
+        <span><a href="/docs">API docs</a> &middot; <a href="/ui/ai-chat">AI assistant</a> &middot; env: {{ env }}</span>
+      </div>
+    </footer>
+
+    <footer class="pub-foot">
+      <div class="wrap">
+        <div class="cols">
+          <div>
+            <a href="/ui" class="brand">
+              <span class="logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+              </span>
+              <span><span class="bn">Vijay Vargiya</span><small>Group of Hospitals</small></span>
+            </a>
+            <p>Multi-speciality care for the whole family in Jaipur, Rajasthan &mdash; with an AI front desk that
+               finds the right doctor and books your slot, 24&times;7.</p>
+          </div>
+          <div>
+            <h4>Explore</h4>
+            <ul>
+              <li><a href="/ui#departments">Departments</a></li>
+              <li><a href="/ui#doctors">Our doctors</a></li>
+              <li><a href="/ui#how">How it works</a></li>
+              <li><a href="/ui/ai-chat">AI assistant</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4>Portals</h4>
+            <ul>
+              <li><a href="/ui/login">Sign in</a></li>
+              <li><a href="/ui/register">Patient registration</a></li>
+              <li><a href="/ui/patient">Patient portal</a></li>
+              <li><a href="/ui/doctor">Doctor console</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4>Emergency</h4>
+            <ul>
+              <li>Ambulance (India): <a href="tel:108"><b>108</b></a></li>
+              <li>Jaipur, Rajasthan, India</li>
+              <li><a href="/docs">Developer API docs</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="legal">
+          <span>&copy; {{ app_name }}. All rights reserved.</span>
+          <span>The AI assistant never diagnoses or prescribes &mdash; in an emergency call 108.</span>
+        </div>
+      </div>
+    </footer>
+
   </div>
-</footer>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -214,56 +474,117 @@ function guard(...roles) {
   return true;
 }
 
+/* line icons for the sidebar (24x24, stroke based) */
+const ICONS = {
+  grid:   '<rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/>',
+  shield: '<path d="M12 3l8 3v6c0 4.5-3.2 8.2-8 9-4.8-.8-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+  bell:   '<path d="M4 18h16M6 18a6 6 0 0112 0M12 8V5M10 5h4"/>',
+  steth:  '<path d="M6 3v6a4 4 0 008 0V3"/><path d="M10 13v2a5 5 0 0010 0v-1"/><circle cx="20" cy="12" r="2"/>',
+  heart:  '<path d="M20.8 5.6a5.2 5.2 0 00-7.4 0L12 7l-1.4-1.4a5.2 5.2 0 00-7.4 7.4L12 21l8.8-8a5.2 5.2 0 000-7.4z"/>',
+  cal:    '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  users:  '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 010 6.8M18 14.8c2 .7 3.2 2.4 3.5 5.2"/>',
+  clip:   '<rect x="6" y="4" width="12" height="17" rx="3"/><path d="M9 4h6v3H9zM9 12h6M9 16h4"/>',
+  card:   '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h3"/>',
+  spark:  '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/>',
+  pulse:  '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+  lock:   '<rect x="5" y="11" width="14" height="10" rx="3"/><path d="M8 11V8a4 4 0 018 0v3"/>',
+  key:    '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>',
+  server: '<rect x="3" y="4" width="18" height="7" rx="2.5"/><rect x="3" y="13" width="18" height="7" rx="2.5"/><path d="M7 7.5h.01M7 16.5h.01"/>',
+};
+
 /*
  * Navigation must mirror the page guards in app/web.py - a link that only
  * bounces the user back is worse than no link. "roles" lists exactly the roles
  * that can open the page (SUPER_ADMIN is always allowed by page_guard()).
  */
 const NAV = [
-  {href:'/ui/super-admin',   label:'Super Admin', roles:['SUPER_ADMIN']},
-  {href:'/ui/admin',        label:'Admin',      roles:['ADMIN']},
-  {href:'/ui/reception',    label:'Reception',  roles:['RECEPTIONIST']},
-  {href:'/ui/doctor',       label:'Doctor',     roles:['DOCTOR']},
-  {href:'/ui/patient',      label:'My health',  roles:['PATIENT']},
-  {href:'/ui/appointments', label:'Appointments', roles:['PATIENT','DOCTOR','RECEPTIONIST','ADMIN']},
-  {href:'/ui/patients',     label:'Patients',   roles:['DOCTOR','RECEPTIONIST','ADMIN']},
-  {href:'/ui/clinical',     label:'Clinical',   roles:['DOCTOR','ADMIN']},
-  {href:'/ui/billing',      label:'Billing',    roles:['ACCOUNTANT']},
-  {href:'/ui/ai-chat',      label:'AI assistant'},
-  {href:'/ui/ai-monitor',   label:'AI monitor', roles:['ADMIN']},
-  {href:'/ui/security',     label:'Security',   roles:['ADMIN']},
-  {href:'/ui/access',       label:'Access',     roles:['ADMIN']},
-  {href:'/ui/system',       label:'System',     roles:['ADMIN']},
+  {group:'Workspace', href:'/ui/super-admin',  label:'Super Admin',  icon:'shield', roles:['SUPER_ADMIN']},
+  {group:'Workspace', href:'/ui/admin',        label:'Admin',        icon:'grid',   roles:['ADMIN']},
+  {group:'Workspace', href:'/ui/reception',    label:'Reception',    icon:'bell',   roles:['RECEPTIONIST']},
+  {group:'Workspace', href:'/ui/doctor',       label:'Doctor',       icon:'steth',  roles:['DOCTOR']},
+  {group:'Workspace', href:'/ui/patient',      label:'My health',    icon:'heart',  roles:['PATIENT']},
+  {group:'Care',      href:'/ui/appointments', label:'Appointments', icon:'cal',    roles:['PATIENT','DOCTOR','RECEPTIONIST','ADMIN']},
+  {group:'Care',      href:'/ui/patients',     label:'Patients',     icon:'users',  roles:['DOCTOR','RECEPTIONIST','ADMIN']},
+  {group:'Care',      href:'/ui/clinical',     label:'Clinical',     icon:'clip',   roles:['DOCTOR','ADMIN']},
+  {group:'Care',      href:'/ui/billing',      label:'Billing',      icon:'card',   roles:['ACCOUNTANT']},
+  {group:'Intelligence', href:'/ui/ai-chat',   label:'AI assistant', icon:'spark'},
+  {group:'Intelligence', href:'/ui/ai-monitor',label:'AI monitor',   icon:'pulse',  roles:['ADMIN']},
+  {group:'Administration', href:'/ui/security',label:'Security',     icon:'lock',   roles:['ADMIN']},
+  {group:'Administration', href:'/ui/access',  label:'Access',       icon:'key',    roles:['ADMIN']},
+  {group:'Administration', href:'/ui/system',  label:'System',       icon:'server', roles:['ADMIN']},
 ];
+const ROLE_HOME = {SUPER_ADMIN:'/ui/super-admin', ADMIN:'/ui/admin', DOCTOR:'/ui/doctor',
+  RECEPTIONIST:'/ui/reception', ACCOUNTANT:'/ui/billing', PATIENT:'/ui/patient'};
 
-async function mountChrome() {
-  const nav = document.getElementById('nav');
+function initials(name) {
+  const p = String(name || 'U').trim().split(/\s+/).filter(Boolean);
+  return ((p[0]||'U')[0] + (p.length > 1 ? p[p.length-1][0] : '')).toUpperCase();
+}
+function niceRole(r) { return String(r || '').toLowerCase().replace(/_/g,' '); }
+
+async function doLogout(e) {
+  if (e) e.preventDefault();
+  try { await api('/auth/logout', {method:'POST'}); } catch(err) {}
+  Auth.clear(); location.href = '/ui/login';
+}
+
+function mountChrome() {
   const me = Auth.user();
+  const signedIn = !!Auth.token();
+  const layout = document.documentElement.getAttribute('data-layout');
+
+  /* ---------- public navbar: auth buttons ---------- */
+  const pa = document.getElementById('pubAuth');
+  if (signedIn) {
+    const home = ROLE_HOME[Auth.role()] || '/ui';
+    pa.innerHTML = `<a class="btn outline sm" href="${home}">Open dashboard</a>
+      <a class="btn sm" href="#" id="pubLogout">Logout</a>`;
+    document.getElementById('pubLogout').onclick = doLogout;
+  } else {
+    pa.innerHTML = `<a class="btn ghost sm" href="/ui/login">Sign in</a>
+      <a class="btn sm" href="/ui/register">Register</a>`;
+  }
+  document.querySelectorAll('#pubLinks a').forEach(a => {
+    if (a.getAttribute('href') === location.pathname) a.classList.add('on');
+  });
+  const pt = document.getElementById('pubToggle');
+  pt.onclick = () => document.getElementById('pubnav').classList.toggle('open');
+
+  /* ---------- app chrome: sidebar + topbar ---------- */
+  if (layout !== 'app' || !signedIn) return;
+
+  const nav = document.getElementById('nav');
+  let lastGroup = null, html = '';
   NAV.forEach(item => {
     if (item.perms && !item.perms.some(p => Auth.has(p))) return;
     // explicit role list (mirrors the page guard) - SUPER_ADMIN sees everything
     if (item.roles && !item.roles.includes(Auth.role()) && Auth.role() !== 'SUPER_ADMIN') return;
-    const a = document.createElement('a');
-    a.href = item.href; a.textContent = item.label;
-    if (location.pathname === item.href) a.className = 'on';
-    nav.appendChild(a);
+    if (item.group !== lastGroup) { html += `<div class="nav-label">${item.group}</div>`; lastGroup = item.group; }
+    html += `<a class="side-link ${location.pathname === item.href ? 'on' : ''}" href="${item.href}">
+      <svg viewBox="0 0 24 24">${ICONS[item.icon] || ICONS.grid}</svg>${item.label}</a>`;
   });
-  if (!Auth.token()) {
-    nav.innerHTML = '<a href="/ui/login">Login</a><a href="/ui/register">Register</a>';
-    return;
-  }
-  document.getElementById('whoami').style.display = 'flex';
-  document.getElementById('whoName').textContent = me ? me.full_name : 'Signed in';
-  document.getElementById('whoRole').textContent = me ? '· ' + me.role_name : '';
-  document.getElementById('logoutLink').onclick = async (e) => {
-    e.preventDefault();
-    try { await api('/auth/logout', {method:'POST'}); } catch(err) {}
-    Auth.clear(); location.href = '/ui/login';
-  };
+  nav.innerHTML = html;
+
+  const name = me ? me.full_name : 'Signed in';
+  document.getElementById('whoName').textContent = name;
+  document.getElementById('whoRole').textContent = me ? niceRole(me.role_name) : '';
+  document.getElementById('whoAvatar').textContent = initials(name);
+  document.getElementById('logoutLink').onclick = doLogout;
+
+  const h = new Date().getHours();
+  const greet = h < 12 ? 'Good morning' : (h < 17 ? 'Good afternoon' : 'Good evening');
+  document.getElementById('helloLine').textContent = greet + (me ? ', ' + name.split(' ')[0] : '') + ' 👋';
+  document.getElementById('pageTitle').textContent = document.title.split('|')[0].trim() || 'Dashboard';
+  document.getElementById('todayChip').textContent =
+    new Date().toLocaleDateString('en-IN', {weekday:'short', day:'numeric', month:'short', year:'numeric'});
+
+  const body = document.body;
+  document.getElementById('menuBtn').onclick = () => body.classList.toggle('nav-open');
+  document.getElementById('scrim').onclick = () => body.classList.remove('nav-open');
 }
 
 /* ---------------------- dependency-free charts ---------------------- */
-function svgBars(el, data, {key='count', label='date', height=190, color='#12a08a'} = {}) {
+function svgBars(el, data, {key='count', label='date', height=190, color='#2f5bea'} = {}) {
   const w = el.clientWidth || 600, h = height, pad = 28;
   const max = Math.max(1, ...data.map(d => d[key]));
   const bw = data.length ? (w - pad*2) / data.length : 10;
@@ -271,34 +592,38 @@ function svgBars(el, data, {key='count', label='date', height=190, color='#12a08
   data.forEach((d,i) => {
     const v = d[key], bh = (h - pad*2) * (v / max);
     const x = pad + i*bw, y = h - pad - bh;
-    bars += `<rect x="${x+1}" y="${y}" width="${Math.max(2,bw-3)}" height="${bh}" rx="2" fill="${color}" opacity="0.85"><title>${d[label]}: ${v}</title></rect>`;
+    bars += `<rect x="${x+1}" y="${y}" width="${Math.max(2,bw-3)}" height="${bh}" rx="4" fill="${color}" opacity="0.88"><title>${d[label]}: ${v}</title></rect>`;
     if (data.length <= 16 || i % Math.ceil(data.length/12) === 0)
-      labels += `<text x="${x+bw/2}" y="${h-9}" font-size="9" fill="#607875" text-anchor="middle">${String(d[label]).slice(5)}</text>`;
+      labels += `<text x="${x+bw/2}" y="${h-9}" font-size="9" fill="#64748b" text-anchor="middle">${String(d[label]).slice(5)}</text>`;
   });
   el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" class="chart" preserveAspectRatio="none">
-    <line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" stroke="#e2ebe8"/>
+    <line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" stroke="#e5eaf5"/>
     ${bars}${labels}
-    <text x="${pad}" y="14" font-size="10" fill="#607875">max ${max}</text></svg>`;
+    <text x="${pad}" y="14" font-size="10" fill="#64748b">max ${max}</text></svg>`;
 }
 
-function svgLine(el, data, {key='count', label='date', height=190, color='#0e7c6b'} = {}) {
+function svgLine(el, data, {key='count', label='date', height=190, color='#2f5bea'} = {}) {
   const w = el.clientWidth || 600, h = height, pad = 30;
   const max = Math.max(1, ...data.map(d => d[key]));
   const step = data.length > 1 ? (w - pad*2) / (data.length - 1) : 0;
   const pts = data.map((d,i) => [pad + i*step, h - pad - (h - pad*2) * (d[key] / max)]);
   const path = pts.map((p,i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
   const area = path + ` L ${pad + (data.length-1)*step} ${h-pad} L ${pad} ${h-pad} Z`;
+  const gid = 'lg' + Math.random().toString(36).slice(2, 8);
   el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" class="chart" preserveAspectRatio="none">
-    <path d="${area}" fill="${color}" opacity="0.12"/>
-    <path d="${path}" fill="none" stroke="${color}" stroke-width="2.4"/>
-    <line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" stroke="#e2ebe8"/>
-    ${data.length?`<text x="${pad}" y="14" font-size="10" fill="#607875">${data[0][label]} → ${data[data.length-1][label]}</text>`:''}
-    <text x="${pad}" y="${h-9}" font-size="10" fill="#607875">max ${max}</text></svg>`;
+    <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${color}" stop-opacity="0.28"/><stop offset="1" stop-color="${color}" stop-opacity="0.02"/>
+    </linearGradient></defs>
+    <path d="${area}" fill="url(#${gid})"/>
+    <path d="${path}" fill="none" stroke="${color}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" stroke="#e5eaf5"/>
+    ${data.length?`<text x="${pad}" y="14" font-size="10" fill="#64748b">${data[0][label]} → ${data[data.length-1][label]}</text>`:''}
+    <text x="${pad}" y="${h-9}" font-size="10" fill="#64748b">max ${max}</text></svg>`;
 }
 
 function svgDonut(el, entries, size=170) {
   const total = entries.reduce((a,e)=>a+e.value,0) || 1;
-  const colors = ['#0e7c6b','#12a08a','#f4a259','#d99414','#d64545','#5b8def','#8e6bd8','#1f9d55'];
+  const colors = ['#2f5bea','#0fb5a6','#f59e0b','#7c5cf0','#e5484d','#38bdf8','#16a34a','#ec4899'];
   let start = -Math.PI/2, arcs = '';
   entries.forEach((e,i) => {
     const ang = (e.value/total) * Math.PI*2, end = start + ang, r = size/2 - 10;
@@ -306,16 +631,16 @@ function svgDonut(el, entries, size=170) {
     const x2 = size/2 + r*Math.cos(end),   y2 = size/2 + r*Math.sin(end);
     const large = ang > Math.PI ? 1 : 0;
     arcs += `<path d="M ${size/2} ${size/2} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z"
-      fill="${colors[i%colors.length]}" opacity="0.9"><title>${e.label}: ${e.value}</title></path>`;
+      fill="${colors[i%colors.length]}" opacity="0.92"><title>${e.label}: ${e.value}</title></path>`;
     start = end;
   });
-  const legend = entries.map((e,i)=>`<div class="small"><span style="display:inline-block;width:9px;height:9px;
-    border-radius:2px;background:${colors[i%colors.length]};margin-right:6px"></span>${e.label}
+  const legend = entries.map((e,i)=>`<div class="small"><span style="display:inline-block;width:10px;height:10px;
+    border-radius:3px;background:${colors[i%colors.length]};margin-right:7px"></span>${e.label}
     <b>${e.value}</b></div>`).join('');
-  el.innerHTML = `<div class="row" style="align-items:center;gap:18px">
-      <svg width="${size}" height="${size}">${arcs}<circle cx="${size/2}" cy="${size/2}" r="${size/2-34}" fill="#fff"/>
-      <text x="${size/2}" y="${size/2+4}" text-anchor="middle" font-size="16" font-weight="700">${total}</text></svg>
-      <div style="display:flex;flex-direction:column;gap:4px">${legend}</div></div>`;
+  el.innerHTML = `<div class="row" style="align-items:center;gap:20px">
+      <svg width="${size}" height="${size}">${arcs}<circle cx="${size/2}" cy="${size/2}" r="${size/2-36}" fill="#fff"/>
+      <text x="${size/2}" y="${size/2+5}" text-anchor="middle" font-size="18" font-weight="800" fill="#0f1b3d">${total}</text></svg>
+      <div style="display:flex;flex-direction:column;gap:5px">${legend}</div></div>`;
 }
 
 const fmt = {

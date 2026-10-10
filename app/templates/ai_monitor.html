@@ -48,7 +48,7 @@ async function load() {
     ].join('');
 
     svgBars(document.getElementById('chResp'), (m.response_time_trend||[]).map(r => ({date:r.date, count:r.avg_ms})),
-      {key:'count', label:'date', color:'#0e7c6b'});
+      {key:'count', label:'date', color:'#2f5bea'});
 
     document.getElementById('conv').innerHTML = (m.conversations||[]).length ?
       `<table><thead><tr><th>Patient</th><th>Intent</th><th>Stage</th><th>Msgs</th><th>Booked</th><th>Esc</th>

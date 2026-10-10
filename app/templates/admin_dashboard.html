@@ -49,8 +49,8 @@
 
 {% block scripts %}
 <script>
+let days = 30;   // module scope: load() below reads it from outside the guard block
 if (guard()) {
-  let days = 30;
   document.querySelectorAll('[data-days]').forEach(b => b.onclick = () => {
     days = +b.dataset.days;
     document.querySelectorAll('[data-days]').forEach(x => x.classList.toggle('on', x === b));
@@ -100,8 +100,8 @@ async function load() {
     ].join('');
 
     const ch = d.charts;
-    svgLine(document.getElementById('chAppt'), ch.appointment_trend, {key:'count', color:'#12a08a'});
-    svgLine(document.getElementById('chRev'), ch.revenue_trend, {key:'revenue', color:'#0e7c6b'});
+    svgLine(document.getElementById('chAppt'), ch.appointment_trend, {key:'count', color:'#0fb5a6'});
+    svgLine(document.getElementById('chRev'), ch.revenue_trend, {key:'revenue', color:'#2f5bea'});
     svgLine(document.getElementById('chGrowth'), ch.patient_growth, {key:'cumulative', color:'#f4a259'});
     svgDonut(document.getElementById('chMix'), (ch.appointment_status_breakdown||[]).map(r => ({label:r.status, value:r.count})));
     svgDonut(document.getElementById('chSpec'), (ch.popular_specialties||[]).map(r => ({label:r.specialty, value:r.appointments})));
