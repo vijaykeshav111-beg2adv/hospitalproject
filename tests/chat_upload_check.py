@@ -286,8 +286,8 @@ def main() -> int:  # noqa: C901 - a checklist, kept linear on purpose
     # ---------------------------------------------------------- 3. HTTP layer
     with TestClient(app) as client:
         patient_tk = token(client, "ramesh.yadav@example.com", "Patient@123")
-        doctor_tk = token(client, "dr.arjunmehra@vijayvargiiyahospital.in", "Doctor@123")
-        admin_tk = token(client, "admin@vijayvargiiyahospital.in", "Admin@123")
+        doctor_tk = token(client, "dr.arjunmehra@vijayvargiyahospital.in", "Doctor@123")
+        admin_tk = token(client, "admin@vijayvargiyahospital.in", "Admin@123")
         check("http: logins for the upload flow", bool(patient_tk and doctor_tk and admin_tk))
 
         with patch.object(chat_documents.vision, "read_document", fake_read):

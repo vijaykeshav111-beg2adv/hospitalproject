@@ -125,10 +125,10 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"  server version: {sql('SELECT VERSION()')}")
 
-    admin = login(base, "superadmin@vijayvargiiyahospital.in", "SuperAdmin@123")
-    reception = login(base, "reception@vijayvargiiyahospital.in", "Reception@123")
-    doctor_tk = login(base, "dr.arjunmehra@vijayvargiiyahospital.in", "Doctor@123")
-    accountant = login(base, "accounts@vijayvargiiyahospital.in", "Accounts@123")
+    admin = login(base, "superadmin@vijayvargiyahospital.in", "SuperAdmin@123")
+    reception = login(base, "reception@vijayvargiyahospital.in", "Reception@123")
+    doctor_tk = login(base, "dr.arjunmehra@vijayvargiyahospital.in", "Doctor@123")
+    accountant = login(base, "accounts@vijayvargiyahospital.in", "Accounts@123")
     patient_tk = login(base, "ramesh.yadav@example.com", "Patient@123")
 
     # ---------------------------------------------------------------- 1. constraints

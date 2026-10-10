@@ -49,7 +49,7 @@ def intents(_: CurrentUser | None = Depends(get_optional_user)):
                                                                      "PROVIDE_PHONE", "PROVIDE_CONCERN",
                                                                      "CONFIRM_BOOKING", "DECLINE"],
         "stages": ["IDLE", "AWAIT_IDENTITY_NAME", "AWAIT_IDENTITY_PHONE", "AWAIT_CONCERN",
-                   "AWAIT_DOCTOR_CHOICE", "AWAIT_SLOT_CHOICE", "AWAIT_CONFIRMATION",
+                   "AWAIT_DOCTOR_CONSENT", "AWAIT_DOCTOR_CHOICE", "AWAIT_SLOT_CHOICE", "AWAIT_CONFIRMATION",
                    "AWAIT_APPOINTMENT_CHOICE", "POST_BOOK", "ESCALATED_RECEPTION", "ESCALATED_DOCTOR"],
         "safety": {
             "medical_advice_restriction": True,

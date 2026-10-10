@@ -69,7 +69,7 @@ def main(argv: list[str] | None = None) -> int:
     print("  " + "-" * 70)
     for full_name, email, role_name, password, phone in STAFF:
         print(f"   {role_name:<12} {email:<46} {password}")
-    print(f"   {'DOCTOR':<12} {'dr.arjunmehra@vijayvargiiyahospital.in':<46} Doctor@123")
+    print(f"   {'DOCTOR':<12} {'dr.arjunmehra@vijayvargiyahospital.in':<46} Doctor@123")
     print(f"   {'PATIENT':<12} {'ramesh.yadav@example.com':<46} Patient@123")
     print()
     print("  Every seeded doctor uses the password  Doctor@123  and every seeded")

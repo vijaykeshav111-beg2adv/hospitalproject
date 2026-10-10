@@ -148,9 +148,10 @@ INTENT_PATTERNS: list[tuple[str, list[str]]] = [
     ("INVOICE_LOOKUP", [r"\b(invoice|bill|receipt|charges|fees?)\b"]),
     ("NOTIFICATION_REQUEST", [r"\b(send|whatsapp|email|sms|notify|remind me|message me)\b"]),
     ("REVIEW", [r"\b(review|feedback|rating|complain about doctor)\b"]),
-    ("DOCTOR_SEARCH", [r"\b(which doctor|best doctor|available doctor|doctor for|specialist|specialty|department)\b"]),
+    ("DOCTOR_SEARCH", [r"\b(which doctor|best doctor|available doctor|doctor for|specialist|specialty|department)\b",
+                      r"(re?co+m+e?nd|suggest|sujhao)\w*\b.*\b(doctors?|dr|specialist)\b"]),
     ("BOOK_APPOINTMENT", [r"\b(book|appointment|slot|schedule (a )?visit|milna|dikhana|consult)\b"]),
-    ("GREETING", [r"^\s*(hi|hello|hey|namaste|namaskar|good (morning|evening|afternoon))\b"]),
+    ("GREETING", [r"^\s*(hi+|hello+|hey+|helo|namaste|namaskar|good (morning|evening|afternoon))\b"]),
     ("THANKS", [r"\b(thanks|thank you|dhanyavad|shukriya)\b"]),
     ("AFFIRM", [r"^\s*(yes|y|haan|ha|ok|okay|confirm|sure|please do|book it|thik hai)\b"]),
     ("DENY", [r"^\s*(no|n|nahi|nahin|cancel it|not now|no thanks)\b"]),
@@ -979,6 +980,32 @@ def _llm_polish(system: str, factual_reply: str, patient_context: str) -> str | 
 # ==========================================================================
 # MAIN HANDLER
 # ==========================================================================
+def _concern_from_upload(db: Session, conv: models.AIConversation) -> str | None:
+    """Health terms from the AI reading of a file uploaded in this chat.
+
+    Only terms the hospital already knows (same list used for routing) are kept,
+    so a wrong or made-up word from the image reader can never choose a department.
+    """
+    messages = db.scalars(
+        select(models.AIMessage).where(
+            models.AIMessage.conversation_id == conv.id,
+            models.AIMessage.intent == "FILE_UPLOAD",
+        ).order_by(models.AIMessage.id.desc()).limit(3)
+    ).all()
+    vocabulary = known_medical_terms(db)
+    for message in messages:
+        reading = (message.structured or {}).get("ai_reading") or {}
+        if float(reading.get("confidence") or 0) < 0.4:
+            continue
+        terms = [t for t in (reading.get("canonical_terms") or []) if t in vocabulary]
+        area = (reading.get("body_area") or "").strip().lower()
+        if area and area in vocabulary and area not in terms:
+            terms.append(area)
+        if terms:
+            return ", ".join(terms[:4])
+    return None
+
+
 def _doctor_list_reply(concern: dict, routed_specialty: dict, specialty: dict,
                        routing_note: str | None, doctors: list[dict]) -> str:
     """Build the doctor list after explicit patient consent.
@@ -1314,7 +1341,9 @@ def handle_message(db: Session, payload, *, user=None) -> dict:
     # 4b. FLOW: patient answers "Should I show the doctors?"
     # ------------------------------------------------------------------
     if conv.stage == "AWAIT_DOCTOR_CONSENT":
-        said_yes = intent == "AFFIRM"
+        # "show doctors" typed by hand also counts as yes (but "no, don't show" does not)
+        wants_list = bool(re.search(r"\b(show|see|list|view)\b.*\bdoctors?\b", text.lower()))
+        said_yes = (intent == "AFFIRM" or wants_list) and intent not in {"DENY", "DECLINE"}
         said_no = intent in {"DENY", "DECLINE"}
         new_problem = (not said_yes) and (not said_no) and is_new_medical_concern(text)
 
@@ -1783,6 +1812,16 @@ def handle_message(db: Session, payload, *, user=None) -> dict:
                    "INVOICE_LOOKUP", "NOTIFICATION_REQUEST"}
     if intent in {"PROVIDE_CONCERN", "BOOK_APPOINTMENT", "DOCTOR_SEARCH", "GENERAL_QUERY", "PROVIDE_NAME"} \
             or (conv.stage in {"AWAIT_CONCERN", "IDLE"} and intent not in non_concern):
+        # "recommend a doctor" with no problem named, right after an upload:
+        # use what the AI read from the file instead of asking again.
+        if (intent in {"DOCTOR_SEARCH", "BOOK_APPOINTMENT"} and not pending.get("draft_concern")
+                and not is_new_medical_concern(text)):
+            file_concern = _concern_from_upload(db, conv)
+            if file_concern:
+                text = file_concern
+                response["_note"] = (f"I used the reading of the file you uploaded ({file_concern}) "
+                                     "to find the right department.")
+
         # local vocabulary first (0 tokens) -> embeddings hint -> Groq semantics
         concern = understand_concern(db, text)
         route = concern.get("route") or "local"
@@ -2013,11 +2052,23 @@ def handle_message(db: Session, payload, *, user=None) -> dict:
             upcoming = summary["upcoming_appointments"]
             extra = (f"Your next appointment is {upcoming[0]['date']} at {upcoming[0]['time']} "
                      f"with {upcoming[0]['doctor']}.\n\n") if upcoming else ""
+            # Last open concern is shown only to a logged-in patient. Someone who
+            # only typed a phone number in the chat gets the greeting without it,
+            # because a phone number alone is not proof of who is typing.
+            last_concern_line = ""
+            quick = ["Book appointment", "Show my reports", "Payment status"]
+            if getattr(user, "id", None):
+                open_concerns = [c for c in summary["current_concerns"] if c.get("status") == "OPEN"]
+                if open_concerns:
+                    last_text = open_concerns[0]["concern"].strip()
+                    last_concern_line = (f"Last time you told us: \u201c{last_text[:120]}\u201d. "
+                                         "Is it still troubling you?\n\n")
+                    quick = [f"Find doctor for: {last_text[:60]}", "I have a new problem"] + quick[:2]
             response.update({
                 "reply": (f"Namaste {patient.full_name}! Welcome back to Vijay Vargiya Group of Hospitals.\n\n"
-                          f"{extra}I can book an appointment, share reports or check your bill. "
+                          f"{extra}{last_concern_line}I can book an appointment, share reports or check your bill. "
                           "What would you like?"),
-                "quick_replies": ["Book appointment", "Show my reports", "Payment status"],
+                "quick_replies": quick,
             })
         else:
             conv.stage = conv.stage if conv.stage != "IDLE" else "IDLE"

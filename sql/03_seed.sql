@@ -972,266 +972,266 @@ INSERT INTO holidays (name, holiday_date, is_full_day, created_at, updated_at)
 
 -- demo staff logins (change the passwords in production!) ---
 INSERT INTO users (uuid, full_name, email, phone, password_hash, role_id, is_active, is_verified, must_change_password, phone_verified, failed_login_attempts, password_changed_at, created_at, updated_at)
-  SELECT REPLACE(UUID(),'-',''), 'Vijay Vargiya', 'superadmin@vijayvargiiyahospital.in', '9000000001', 'pbkdf2_sha256$260000$3Cf1U0yrq1j+SNDRr1IeGA==$P/jlQiaLdjGhV9yGwGGgqtWFD0gDRgeXTzGz7ManFQA=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'SUPER_ADMIN'
+  SELECT REPLACE(UUID(),'-',''), 'Vijay Vargiya', 'superadmin@vijayvargiyahospital.in', '9000000001', 'pbkdf2_sha256$260000$3Cf1U0yrq1j+SNDRr1IeGA==$P/jlQiaLdjGhV9yGwGGgqtWFD0gDRgeXTzGz7ManFQA=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'SUPER_ADMIN'
   ON DUPLICATE KEY UPDATE full_name = VALUES(full_name);
 INSERT INTO users (uuid, full_name, email, phone, password_hash, role_id, is_active, is_verified, must_change_password, phone_verified, failed_login_attempts, password_changed_at, created_at, updated_at)
-  SELECT REPLACE(UUID(),'-',''), 'Hospital Admin', 'admin@vijayvargiiyahospital.in', '9000000002', 'pbkdf2_sha256$260000$RC9SJ2O4tBpwFKvUqkC/zg==$/AgOsWS4chM4UYNuufQYLtvV2EUxJhWfd59FXkUYXsE=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'ADMIN'
+  SELECT REPLACE(UUID(),'-',''), 'Hospital Admin', 'admin@vijayvargiyahospital.in', '9000000002', 'pbkdf2_sha256$260000$RC9SJ2O4tBpwFKvUqkC/zg==$/AgOsWS4chM4UYNuufQYLtvV2EUxJhWfd59FXkUYXsE=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'ADMIN'
   ON DUPLICATE KEY UPDATE full_name = VALUES(full_name);
 INSERT INTO users (uuid, full_name, email, phone, password_hash, role_id, is_active, is_verified, must_change_password, phone_verified, failed_login_attempts, password_changed_at, created_at, updated_at)
-  SELECT REPLACE(UUID(),'-',''), 'Front Desk - Ritu', 'reception@vijayvargiiyahospital.in', '9000000003', 'pbkdf2_sha256$260000$VIsNMtFe7qx465sDMPzvOQ==$miEWYy13hJRUnI7l782M135ovuEvlz/llvUrikSx4GE=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'RECEPTIONIST'
+  SELECT REPLACE(UUID(),'-',''), 'Front Desk - Ritu', 'reception@vijayvargiyahospital.in', '9000000003', 'pbkdf2_sha256$260000$VIsNMtFe7qx465sDMPzvOQ==$miEWYy13hJRUnI7l782M135ovuEvlz/llvUrikSx4GE=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'RECEPTIONIST'
   ON DUPLICATE KEY UPDATE full_name = VALUES(full_name);
 INSERT INTO users (uuid, full_name, email, phone, password_hash, role_id, is_active, is_verified, must_change_password, phone_verified, failed_login_attempts, password_changed_at, created_at, updated_at)
-  SELECT REPLACE(UUID(),'-',''), 'Accounts - Mahesh', 'accounts@vijayvargiiyahospital.in', '9000000004', 'pbkdf2_sha256$260000$nQivQiJfcR9trb74qC0h+A==$ydxZLCpgfS8l0lSxQXjs1uIS0xj8QKR1qKFRs3BVFLs=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'ACCOUNTANT'
+  SELECT REPLACE(UUID(),'-',''), 'Accounts - Mahesh', 'accounts@vijayvargiyahospital.in', '9000000004', 'pbkdf2_sha256$260000$nQivQiJfcR9trb74qC0h+A==$ydxZLCpgfS8l0lSxQXjs1uIS0xj8QKR1qKFRs3BVFLs=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'ACCOUNTANT'
   ON DUPLICATE KEY UPDATE full_name = VALUES(full_name);
 
 -- demo doctor logins (password: Doctor@123) ---
 INSERT INTO users (uuid, full_name, email, password_hash, role_id, is_active, is_verified, must_change_password, phone_verified, failed_login_attempts, password_changed_at, created_at, updated_at)
-  SELECT REPLACE(UUID(),'-',''), 'Dr Arjun Mehra', 'dr.arjunmehra@vijayvargiiyahospital.in', 'pbkdf2_sha256$260000$WwL/aFJayjM/JYalGJeoJw==$bJjasZlAXZRRUmDJ2+SU08W0GdgGZN6xT7J01JGTRTs=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'DOCTOR'
+  SELECT REPLACE(UUID(),'-',''), 'Dr Arjun Mehra', 'dr.arjunmehra@vijayvargiyahospital.in', 'pbkdf2_sha256$260000$WwL/aFJayjM/JYalGJeoJw==$bJjasZlAXZRRUmDJ2+SU08W0GdgGZN6xT7J01JGTRTs=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'DOCTOR'
   ON DUPLICATE KEY UPDATE full_name = VALUES(full_name);
 INSERT INTO doctors (doctor_code, user_id, specialty_id, full_name, email, qualifications, experience_years, registration_no, languages, consultation_fee, follow_up_fee, slot_duration_minutes, daily_capacity, room_number, is_available_for_ai_booking, is_active, rating_avg, rating_count, created_at, updated_at)
-  SELECT 'DOC-0001', u.id, s.id, 'Dr Arjun Mehra', 'dr.arjunmehra@vijayvargiiyahospital.in', 'MBBS, MD (Internal Medicine)', 14, 'RMC/RJ/2011/1001', 'Hindi, English', 500, 300, 30, 24, '101', 1, 1, 0, 0, NOW(), NOW()
-  FROM users u, specialties s WHERE u.email = 'dr.arjunmehra@vijayvargiiyahospital.in' AND s.code = 'GENMED'
-  AND NOT EXISTS (SELECT 1 FROM doctors d WHERE d.email = 'dr.arjunmehra@vijayvargiiyahospital.in');
+  SELECT 'DOC-0001', u.id, s.id, 'Dr Arjun Mehra', 'dr.arjunmehra@vijayvargiyahospital.in', 'MBBS, MD (Internal Medicine)', 14, 'RMC/RJ/2011/1001', 'Hindi, English', 500, 300, 30, 24, '101', 1, 1, 0, 0, NOW(), NOW()
+  FROM users u, specialties s WHERE u.email = 'dr.arjunmehra@vijayvargiyahospital.in' AND s.code = 'GENMED'
+  AND NOT EXISTS (SELECT 1 FROM doctors d WHERE d.email = 'dr.arjunmehra@vijayvargiyahospital.in');
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 0, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.arjunmehra@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.arjunmehra@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 0);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 1, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.arjunmehra@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.arjunmehra@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 1);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 2, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.arjunmehra@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.arjunmehra@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 2);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 3, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.arjunmehra@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.arjunmehra@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 3);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 4, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.arjunmehra@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.arjunmehra@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 4);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 5, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.arjunmehra@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.arjunmehra@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 5);
 INSERT INTO users (uuid, full_name, email, password_hash, role_id, is_active, is_verified, must_change_password, phone_verified, failed_login_attempts, password_changed_at, created_at, updated_at)
-  SELECT REPLACE(UUID(),'-',''), 'Dr Nidhi Sharma', 'dr.nidhisharma@vijayvargiiyahospital.in', 'pbkdf2_sha256$260000$WwL/aFJayjM/JYalGJeoJw==$bJjasZlAXZRRUmDJ2+SU08W0GdgGZN6xT7J01JGTRTs=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'DOCTOR'
+  SELECT REPLACE(UUID(),'-',''), 'Dr Nidhi Sharma', 'dr.nidhisharma@vijayvargiyahospital.in', 'pbkdf2_sha256$260000$WwL/aFJayjM/JYalGJeoJw==$bJjasZlAXZRRUmDJ2+SU08W0GdgGZN6xT7J01JGTRTs=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'DOCTOR'
   ON DUPLICATE KEY UPDATE full_name = VALUES(full_name);
 INSERT INTO doctors (doctor_code, user_id, specialty_id, full_name, email, qualifications, experience_years, registration_no, languages, consultation_fee, follow_up_fee, slot_duration_minutes, daily_capacity, room_number, is_available_for_ai_booking, is_active, rating_avg, rating_count, created_at, updated_at)
-  SELECT 'DOC-0002', u.id, s.id, 'Dr Nidhi Sharma', 'dr.nidhisharma@vijayvargiiyahospital.in', 'MBBS, MD, DM (Cardiology)', 18, 'RMC/RJ/2012/1002', 'Hindi, English', 900, 540, 30, 24, '102', 1, 1, 0, 0, NOW(), NOW()
-  FROM users u, specialties s WHERE u.email = 'dr.nidhisharma@vijayvargiiyahospital.in' AND s.code = 'CARDIOLOGY'
-  AND NOT EXISTS (SELECT 1 FROM doctors d WHERE d.email = 'dr.nidhisharma@vijayvargiiyahospital.in');
+  SELECT 'DOC-0002', u.id, s.id, 'Dr Nidhi Sharma', 'dr.nidhisharma@vijayvargiyahospital.in', 'MBBS, MD, DM (Cardiology)', 18, 'RMC/RJ/2012/1002', 'Hindi, English', 900, 540, 30, 24, '102', 1, 1, 0, 0, NOW(), NOW()
+  FROM users u, specialties s WHERE u.email = 'dr.nidhisharma@vijayvargiyahospital.in' AND s.code = 'CARDIOLOGY'
+  AND NOT EXISTS (SELECT 1 FROM doctors d WHERE d.email = 'dr.nidhisharma@vijayvargiyahospital.in');
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 0, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.nidhisharma@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.nidhisharma@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 0);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 1, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.nidhisharma@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.nidhisharma@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 1);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 2, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.nidhisharma@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.nidhisharma@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 2);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 3, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.nidhisharma@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.nidhisharma@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 3);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 4, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.nidhisharma@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.nidhisharma@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 4);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 5, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.nidhisharma@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.nidhisharma@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 5);
 INSERT INTO users (uuid, full_name, email, password_hash, role_id, is_active, is_verified, must_change_password, phone_verified, failed_login_attempts, password_changed_at, created_at, updated_at)
-  SELECT REPLACE(UUID(),'-',''), 'Dr Rakesh Choudhary', 'dr.rakeshchoudhary@vijayvargiiyahospital.in', 'pbkdf2_sha256$260000$WwL/aFJayjM/JYalGJeoJw==$bJjasZlAXZRRUmDJ2+SU08W0GdgGZN6xT7J01JGTRTs=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'DOCTOR'
+  SELECT REPLACE(UUID(),'-',''), 'Dr Rakesh Choudhary', 'dr.rakeshchoudhary@vijayvargiyahospital.in', 'pbkdf2_sha256$260000$WwL/aFJayjM/JYalGJeoJw==$bJjasZlAXZRRUmDJ2+SU08W0GdgGZN6xT7J01JGTRTs=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'DOCTOR'
   ON DUPLICATE KEY UPDATE full_name = VALUES(full_name);
 INSERT INTO doctors (doctor_code, user_id, specialty_id, full_name, email, qualifications, experience_years, registration_no, languages, consultation_fee, follow_up_fee, slot_duration_minutes, daily_capacity, room_number, is_available_for_ai_booking, is_active, rating_avg, rating_count, created_at, updated_at)
-  SELECT 'DOC-0003', u.id, s.id, 'Dr Rakesh Choudhary', 'dr.rakeshchoudhary@vijayvargiiyahospital.in', 'MBBS, MS (Orthopaedics)', 12, 'RMC/RJ/2013/1003', 'Hindi, English', 700, 420, 30, 24, '103', 1, 1, 0, 0, NOW(), NOW()
-  FROM users u, specialties s WHERE u.email = 'dr.rakeshchoudhary@vijayvargiiyahospital.in' AND s.code = 'ORTHO'
-  AND NOT EXISTS (SELECT 1 FROM doctors d WHERE d.email = 'dr.rakeshchoudhary@vijayvargiiyahospital.in');
+  SELECT 'DOC-0003', u.id, s.id, 'Dr Rakesh Choudhary', 'dr.rakeshchoudhary@vijayvargiyahospital.in', 'MBBS, MS (Orthopaedics)', 12, 'RMC/RJ/2013/1003', 'Hindi, English', 700, 420, 30, 24, '103', 1, 1, 0, 0, NOW(), NOW()
+  FROM users u, specialties s WHERE u.email = 'dr.rakeshchoudhary@vijayvargiyahospital.in' AND s.code = 'ORTHO'
+  AND NOT EXISTS (SELECT 1 FROM doctors d WHERE d.email = 'dr.rakeshchoudhary@vijayvargiyahospital.in');
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 0, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.rakeshchoudhary@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.rakeshchoudhary@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 0);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 1, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.rakeshchoudhary@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.rakeshchoudhary@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 1);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 2, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.rakeshchoudhary@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.rakeshchoudhary@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 2);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 3, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.rakeshchoudhary@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.rakeshchoudhary@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 3);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 4, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.rakeshchoudhary@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.rakeshchoudhary@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 4);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 5, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.rakeshchoudhary@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.rakeshchoudhary@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 5);
 INSERT INTO users (uuid, full_name, email, password_hash, role_id, is_active, is_verified, must_change_password, phone_verified, failed_login_attempts, password_changed_at, created_at, updated_at)
-  SELECT REPLACE(UUID(),'-',''), 'Dr Priya Agarwal', 'dr.priyaagarwal@vijayvargiiyahospital.in', 'pbkdf2_sha256$260000$WwL/aFJayjM/JYalGJeoJw==$bJjasZlAXZRRUmDJ2+SU08W0GdgGZN6xT7J01JGTRTs=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'DOCTOR'
+  SELECT REPLACE(UUID(),'-',''), 'Dr Priya Agarwal', 'dr.priyaagarwal@vijayvargiyahospital.in', 'pbkdf2_sha256$260000$WwL/aFJayjM/JYalGJeoJw==$bJjasZlAXZRRUmDJ2+SU08W0GdgGZN6xT7J01JGTRTs=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'DOCTOR'
   ON DUPLICATE KEY UPDATE full_name = VALUES(full_name);
 INSERT INTO doctors (doctor_code, user_id, specialty_id, full_name, email, qualifications, experience_years, registration_no, languages, consultation_fee, follow_up_fee, slot_duration_minutes, daily_capacity, room_number, is_available_for_ai_booking, is_active, rating_avg, rating_count, created_at, updated_at)
-  SELECT 'DOC-0004', u.id, s.id, 'Dr Priya Agarwal', 'dr.priyaagarwal@vijayvargiiyahospital.in', 'MBBS, MD (Dermatology)', 9, 'RMC/RJ/2014/1004', 'Hindi, English', 600, 360, 30, 24, '104', 1, 1, 0, 0, NOW(), NOW()
-  FROM users u, specialties s WHERE u.email = 'dr.priyaagarwal@vijayvargiiyahospital.in' AND s.code = 'DERMA'
-  AND NOT EXISTS (SELECT 1 FROM doctors d WHERE d.email = 'dr.priyaagarwal@vijayvargiiyahospital.in');
+  SELECT 'DOC-0004', u.id, s.id, 'Dr Priya Agarwal', 'dr.priyaagarwal@vijayvargiyahospital.in', 'MBBS, MD (Dermatology)', 9, 'RMC/RJ/2014/1004', 'Hindi, English', 600, 360, 30, 24, '104', 1, 1, 0, 0, NOW(), NOW()
+  FROM users u, specialties s WHERE u.email = 'dr.priyaagarwal@vijayvargiyahospital.in' AND s.code = 'DERMA'
+  AND NOT EXISTS (SELECT 1 FROM doctors d WHERE d.email = 'dr.priyaagarwal@vijayvargiyahospital.in');
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 0, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.priyaagarwal@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.priyaagarwal@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 0);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 1, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.priyaagarwal@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.priyaagarwal@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 1);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 2, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.priyaagarwal@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.priyaagarwal@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 2);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 3, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.priyaagarwal@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.priyaagarwal@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 3);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 4, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.priyaagarwal@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.priyaagarwal@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 4);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 5, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.priyaagarwal@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.priyaagarwal@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 5);
 INSERT INTO users (uuid, full_name, email, password_hash, role_id, is_active, is_verified, must_change_password, phone_verified, failed_login_attempts, password_changed_at, created_at, updated_at)
-  SELECT REPLACE(UUID(),'-',''), 'Dr Sameer Khan', 'dr.sameerkhan@vijayvargiiyahospital.in', 'pbkdf2_sha256$260000$WwL/aFJayjM/JYalGJeoJw==$bJjasZlAXZRRUmDJ2+SU08W0GdgGZN6xT7J01JGTRTs=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'DOCTOR'
+  SELECT REPLACE(UUID(),'-',''), 'Dr Sameer Khan', 'dr.sameerkhan@vijayvargiyahospital.in', 'pbkdf2_sha256$260000$WwL/aFJayjM/JYalGJeoJw==$bJjasZlAXZRRUmDJ2+SU08W0GdgGZN6xT7J01JGTRTs=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'DOCTOR'
   ON DUPLICATE KEY UPDATE full_name = VALUES(full_name);
 INSERT INTO doctors (doctor_code, user_id, specialty_id, full_name, email, qualifications, experience_years, registration_no, languages, consultation_fee, follow_up_fee, slot_duration_minutes, daily_capacity, room_number, is_available_for_ai_booking, is_active, rating_avg, rating_count, created_at, updated_at)
-  SELECT 'DOC-0005', u.id, s.id, 'Dr Sameer Khan', 'dr.sameerkhan@vijayvargiiyahospital.in', 'MBBS, MD (Paediatrics)', 15, 'RMC/RJ/2015/1005', 'Hindi, English', 600, 360, 30, 24, '105', 1, 1, 0, 0, NOW(), NOW()
-  FROM users u, specialties s WHERE u.email = 'dr.sameerkhan@vijayvargiiyahospital.in' AND s.code = 'PEDIA'
-  AND NOT EXISTS (SELECT 1 FROM doctors d WHERE d.email = 'dr.sameerkhan@vijayvargiiyahospital.in');
+  SELECT 'DOC-0005', u.id, s.id, 'Dr Sameer Khan', 'dr.sameerkhan@vijayvargiyahospital.in', 'MBBS, MD (Paediatrics)', 15, 'RMC/RJ/2015/1005', 'Hindi, English', 600, 360, 30, 24, '105', 1, 1, 0, 0, NOW(), NOW()
+  FROM users u, specialties s WHERE u.email = 'dr.sameerkhan@vijayvargiyahospital.in' AND s.code = 'PEDIA'
+  AND NOT EXISTS (SELECT 1 FROM doctors d WHERE d.email = 'dr.sameerkhan@vijayvargiyahospital.in');
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 0, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.sameerkhan@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.sameerkhan@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 0);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 1, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.sameerkhan@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.sameerkhan@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 1);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 2, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.sameerkhan@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.sameerkhan@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 2);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 3, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.sameerkhan@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.sameerkhan@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 3);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 4, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.sameerkhan@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.sameerkhan@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 4);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 5, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.sameerkhan@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.sameerkhan@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 5);
 INSERT INTO users (uuid, full_name, email, password_hash, role_id, is_active, is_verified, must_change_password, phone_verified, failed_login_attempts, password_changed_at, created_at, updated_at)
-  SELECT REPLACE(UUID(),'-',''), 'Dr Anjali Rathore', 'dr.anjalirathore@vijayvargiiyahospital.in', 'pbkdf2_sha256$260000$WwL/aFJayjM/JYalGJeoJw==$bJjasZlAXZRRUmDJ2+SU08W0GdgGZN6xT7J01JGTRTs=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'DOCTOR'
+  SELECT REPLACE(UUID(),'-',''), 'Dr Anjali Rathore', 'dr.anjalirathore@vijayvargiyahospital.in', 'pbkdf2_sha256$260000$WwL/aFJayjM/JYalGJeoJw==$bJjasZlAXZRRUmDJ2+SU08W0GdgGZN6xT7J01JGTRTs=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'DOCTOR'
   ON DUPLICATE KEY UPDATE full_name = VALUES(full_name);
 INSERT INTO doctors (doctor_code, user_id, specialty_id, full_name, email, qualifications, experience_years, registration_no, languages, consultation_fee, follow_up_fee, slot_duration_minutes, daily_capacity, room_number, is_available_for_ai_booking, is_active, rating_avg, rating_count, created_at, updated_at)
-  SELECT 'DOC-0006', u.id, s.id, 'Dr Anjali Rathore', 'dr.anjalirathore@vijayvargiiyahospital.in', 'MBBS, MS (Obs & Gynae)', 16, 'RMC/RJ/2016/1006', 'Hindi, English', 800, 480, 30, 24, '106', 1, 1, 0, 0, NOW(), NOW()
-  FROM users u, specialties s WHERE u.email = 'dr.anjalirathore@vijayvargiiyahospital.in' AND s.code = 'GYNAE'
-  AND NOT EXISTS (SELECT 1 FROM doctors d WHERE d.email = 'dr.anjalirathore@vijayvargiiyahospital.in');
+  SELECT 'DOC-0006', u.id, s.id, 'Dr Anjali Rathore', 'dr.anjalirathore@vijayvargiyahospital.in', 'MBBS, MS (Obs & Gynae)', 16, 'RMC/RJ/2016/1006', 'Hindi, English', 800, 480, 30, 24, '106', 1, 1, 0, 0, NOW(), NOW()
+  FROM users u, specialties s WHERE u.email = 'dr.anjalirathore@vijayvargiyahospital.in' AND s.code = 'GYNAE'
+  AND NOT EXISTS (SELECT 1 FROM doctors d WHERE d.email = 'dr.anjalirathore@vijayvargiyahospital.in');
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 0, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.anjalirathore@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.anjalirathore@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 0);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 1, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.anjalirathore@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.anjalirathore@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 1);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 2, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.anjalirathore@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.anjalirathore@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 2);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 3, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.anjalirathore@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.anjalirathore@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 3);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 4, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.anjalirathore@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.anjalirathore@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 4);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 5, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.anjalirathore@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.anjalirathore@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 5);
 INSERT INTO users (uuid, full_name, email, password_hash, role_id, is_active, is_verified, must_change_password, phone_verified, failed_login_attempts, password_changed_at, created_at, updated_at)
-  SELECT REPLACE(UUID(),'-',''), 'Dr Vikas Jain', 'dr.vikasjain@vijayvargiiyahospital.in', 'pbkdf2_sha256$260000$WwL/aFJayjM/JYalGJeoJw==$bJjasZlAXZRRUmDJ2+SU08W0GdgGZN6xT7J01JGTRTs=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'DOCTOR'
+  SELECT REPLACE(UUID(),'-',''), 'Dr Vikas Jain', 'dr.vikasjain@vijayvargiyahospital.in', 'pbkdf2_sha256$260000$WwL/aFJayjM/JYalGJeoJw==$bJjasZlAXZRRUmDJ2+SU08W0GdgGZN6xT7J01JGTRTs=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'DOCTOR'
   ON DUPLICATE KEY UPDATE full_name = VALUES(full_name);
 INSERT INTO doctors (doctor_code, user_id, specialty_id, full_name, email, qualifications, experience_years, registration_no, languages, consultation_fee, follow_up_fee, slot_duration_minutes, daily_capacity, room_number, is_available_for_ai_booking, is_active, rating_avg, rating_count, created_at, updated_at)
-  SELECT 'DOC-0007', u.id, s.id, 'Dr Vikas Jain', 'dr.vikasjain@vijayvargiiyahospital.in', 'MBBS, MS (ENT)', 11, 'RMC/RJ/2017/1007', 'Hindi, English', 600, 360, 30, 24, '107', 1, 1, 0, 0, NOW(), NOW()
-  FROM users u, specialties s WHERE u.email = 'dr.vikasjain@vijayvargiiyahospital.in' AND s.code = 'ENT'
-  AND NOT EXISTS (SELECT 1 FROM doctors d WHERE d.email = 'dr.vikasjain@vijayvargiiyahospital.in');
+  SELECT 'DOC-0007', u.id, s.id, 'Dr Vikas Jain', 'dr.vikasjain@vijayvargiyahospital.in', 'MBBS, MS (ENT)', 11, 'RMC/RJ/2017/1007', 'Hindi, English', 600, 360, 30, 24, '107', 1, 1, 0, 0, NOW(), NOW()
+  FROM users u, specialties s WHERE u.email = 'dr.vikasjain@vijayvargiyahospital.in' AND s.code = 'ENT'
+  AND NOT EXISTS (SELECT 1 FROM doctors d WHERE d.email = 'dr.vikasjain@vijayvargiyahospital.in');
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 0, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.vikasjain@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.vikasjain@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 0);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 1, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.vikasjain@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.vikasjain@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 1);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 2, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.vikasjain@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.vikasjain@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 2);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 3, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.vikasjain@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.vikasjain@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 3);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 4, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.vikasjain@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.vikasjain@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 4);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 5, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.vikasjain@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.vikasjain@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 5);
 INSERT INTO users (uuid, full_name, email, password_hash, role_id, is_active, is_verified, must_change_password, phone_verified, failed_login_attempts, password_changed_at, created_at, updated_at)
-  SELECT REPLACE(UUID(),'-',''), 'Dr Meena Kumari', 'dr.meenakumari@vijayvargiiyahospital.in', 'pbkdf2_sha256$260000$WwL/aFJayjM/JYalGJeoJw==$bJjasZlAXZRRUmDJ2+SU08W0GdgGZN6xT7J01JGTRTs=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'DOCTOR'
+  SELECT REPLACE(UUID(),'-',''), 'Dr Meena Kumari', 'dr.meenakumari@vijayvargiyahospital.in', 'pbkdf2_sha256$260000$WwL/aFJayjM/JYalGJeoJw==$bJjasZlAXZRRUmDJ2+SU08W0GdgGZN6xT7J01JGTRTs=', r.id, 1, 1, 1, 1, 0, NOW(), NOW(), NOW() FROM roles r WHERE r.name = 'DOCTOR'
   ON DUPLICATE KEY UPDATE full_name = VALUES(full_name);
 INSERT INTO doctors (doctor_code, user_id, specialty_id, full_name, email, qualifications, experience_years, registration_no, languages, consultation_fee, follow_up_fee, slot_duration_minutes, daily_capacity, room_number, is_available_for_ai_booking, is_active, rating_avg, rating_count, created_at, updated_at)
-  SELECT 'DOC-0008', u.id, s.id, 'Dr Meena Kumari', 'dr.meenakumari@vijayvargiiyahospital.in', 'MBBS, MD, DM (Neurology)', 13, 'RMC/RJ/2018/1008', 'Hindi, English', 1000, 600, 30, 24, '108', 1, 1, 0, 0, NOW(), NOW()
-  FROM users u, specialties s WHERE u.email = 'dr.meenakumari@vijayvargiiyahospital.in' AND s.code = 'NEURO'
-  AND NOT EXISTS (SELECT 1 FROM doctors d WHERE d.email = 'dr.meenakumari@vijayvargiiyahospital.in');
+  SELECT 'DOC-0008', u.id, s.id, 'Dr Meena Kumari', 'dr.meenakumari@vijayvargiyahospital.in', 'MBBS, MD, DM (Neurology)', 13, 'RMC/RJ/2018/1008', 'Hindi, English', 1000, 600, 30, 24, '108', 1, 1, 0, 0, NOW(), NOW()
+  FROM users u, specialties s WHERE u.email = 'dr.meenakumari@vijayvargiyahospital.in' AND s.code = 'NEURO'
+  AND NOT EXISTS (SELECT 1 FROM doctors d WHERE d.email = 'dr.meenakumari@vijayvargiyahospital.in');
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 0, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.meenakumari@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.meenakumari@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 0);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 1, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.meenakumari@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.meenakumari@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 1);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 2, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.meenakumari@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.meenakumari@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 2);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 3, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.meenakumari@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.meenakumari@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 3);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 4, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.meenakumari@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.meenakumari@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 4);
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, break_start, break_end, slot_duration_minutes, capacity_per_slot, is_active, created_at, updated_at)
   SELECT d.id, 5, '09:30:00', '17:30:00', '13:00:00', '14:00:00', 30, 1, 1, NOW(), NOW()
-  FROM doctors d WHERE d.email = 'dr.meenakumari@vijayvargiiyahospital.in'
+  FROM doctors d WHERE d.email = 'dr.meenakumari@vijayvargiyahospital.in'
   AND NOT EXISTS (SELECT 1 FROM doctor_schedules ds WHERE ds.doctor_id = d.id AND ds.day_of_week = 5);
 
 -- done ---

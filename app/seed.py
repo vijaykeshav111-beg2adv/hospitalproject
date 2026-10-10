@@ -104,10 +104,10 @@ PATIENTS = [
 ]
 
 STAFF = [
-    ("Vijay Vargiya", "superadmin@vijayvargiiyahospital.in", "SUPER_ADMIN", "SuperAdmin@123", "9000000001"),
-    ("Hospital Admin", "admin@vijayvargiiyahospital.in", "ADMIN", "Admin@123", "9000000002"),
-    ("Front Desk - Ritu", "reception@vijayvargiiyahospital.in", "RECEPTIONIST", "Reception@123", "9000000003"),
-    ("Accounts - Mahesh", "accounts@vijayvargiiyahospital.in", "ACCOUNTANT", "Accounts@123", "9000000004"),
+    ("Vijay Vargiya", "superadmin@vijayvargiyahospital.in", "SUPER_ADMIN", "SuperAdmin@123", "9000000001"),
+    ("Hospital Admin", "admin@vijayvargiyahospital.in", "ADMIN", "Admin@123", "9000000002"),
+    ("Front Desk - Ritu", "reception@vijayvargiyahospital.in", "RECEPTIONIST", "Reception@123", "9000000003"),
+    ("Accounts - Mahesh", "accounts@vijayvargiyahospital.in", "ACCOUNTANT", "Accounts@123", "9000000004"),
 ]
 
 
@@ -190,7 +190,7 @@ def seed_users_and_doctors(db: Session) -> None:
     doctor_role = db.scalar(select(models.Role).where(models.Role.name == "DOCTOR"))
     for idx, (name, specialty_code, quals, exp, fee, follow_up, slot_min, capacity, room) in enumerate(DOCTORS):
         specialty = db.scalar(select(models.Specialty).where(models.Specialty.code == specialty_code))
-        email = f"{name.lower().replace('dr ', 'dr.').replace(' ', '')}@vijayvargiiyahospital.in"
+        email = f"{name.lower().replace('dr ', 'dr.').replace(' ', '')}@vijayvargiyahospital.in"
         user = db.scalar(select(models.User).where(models.User.email == email))
         if not user:
             user = models.User(
@@ -519,5 +519,5 @@ if __name__ == "__main__":
     print("\nLogins (password in brackets):")
     for full_name, email, role_name, password, phone in STAFF:
         print(f"  {role_name:<12} {email:<45} [{password}]")
-    print(f"  {'DOCTOR':<12} dr.arjunmehra@vijayvargiiyahospital.in            [Doctor@123]")
+    print(f"  {'DOCTOR':<12} dr.arjunmehra@vijayvargiyahospital.in            [Doctor@123]")
     print(f"  {'PATIENT':<12} ramesh.yadav@example.com                        [Patient@123]")

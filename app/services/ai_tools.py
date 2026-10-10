@@ -13,7 +13,7 @@ import random
 import string
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from .. import models
@@ -271,33 +271,29 @@ def search_doctors(db: Session, ctx: ToolContext, specialty_id: int | None = Non
             .order_by(models.Slot.slot_date, models.Slot.start_time)
             .limit(1)
         )
-        # Fetch only real written reviews from the existing reviews table.
-        # We intentionally do not invent, paraphrase, or generate review text.
+        # Only real reviews: approved by admin, written by the patient after a
+        # completed visit (appointment_id is set). Nothing is invented or rewritten.
         review_rows = db.execute(
-            text(
-                "SELECT rating, comment, status, created_at "
-                "FROM reviews "
-                "WHERE doctor_id = :doctor_id "
-                "AND comment IS NOT NULL "
-                "AND TRIM(comment) <> '' "
-                "ORDER BY created_at DESC "
-                "LIMIT 3"
-            ),
-            {"doctor_id": doc.id},
-        ).mappings().all()
+            select(models.Review.rating, models.Review.comment, models.Review.created_at)
+            .where(
+                models.Review.doctor_id == doc.id,
+                models.Review.status == "APPROVED",
+                models.Review.appointment_id.is_not(None),
+                models.Review.rating.between(1, 5),
+                models.Review.comment.is_not(None),
+                func.trim(models.Review.comment) != "",
+            )
+            .order_by(models.Review.created_at.desc())
+            .limit(3)
+        ).all()
 
-        # Only expose moderated/approved review text. If a deployment uses a
-        # different status vocabulary, the row is safely excluded rather than
-        # displaying an unverified review.
         verified_reviews = [
             {
-                "rating": int(row["rating"]),
-                "comment": str(row["comment"]).strip(),
-                "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+                "rating": int(row.rating),
+                "comment": str(row.comment).strip(),
+                "created_at": row.created_at.isoformat() if row.created_at else None,
             }
             for row in review_rows
-            if str(row["status"] or "").upper() in {"APPROVED", "PUBLISHED", "VERIFIED", "ACTIVE"}
-            and 1 <= int(row["rating"]) <= 5
         ]
 
         out.append({

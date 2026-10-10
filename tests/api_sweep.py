@@ -19,11 +19,11 @@ import urllib.request
 from collections import defaultdict
 
 DEMO_USERS = {
-    "SUPER_ADMIN": ("superadmin@vijayvargiiyahospital.in", "SuperAdmin@123"),
-    "ADMIN": ("admin@vijayvargiiyahospital.in", "Admin@123"),
-    "DOCTOR": ("dr.arjunmehra@vijayvargiiyahospital.in", "Doctor@123"),
-    "RECEPTIONIST": ("reception@vijayvargiiyahospital.in", "Reception@123"),
-    "ACCOUNTANT": ("accounts@vijayvargiiyahospital.in", "Accounts@123"),
+    "SUPER_ADMIN": ("superadmin@vijayvargiyahospital.in", "SuperAdmin@123"),
+    "ADMIN": ("admin@vijayvargiyahospital.in", "Admin@123"),
+    "DOCTOR": ("dr.arjunmehra@vijayvargiyahospital.in", "Doctor@123"),
+    "RECEPTIONIST": ("reception@vijayvargiyahospital.in", "Reception@123"),
+    "ACCOUNTANT": ("accounts@vijayvargiyahospital.in", "Accounts@123"),
     "PATIENT": ("ramesh.yadav@example.com", "Patient@123"),
 }
 

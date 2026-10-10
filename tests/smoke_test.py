@@ -51,17 +51,17 @@ def main() -> int:
         check("live slots available", len(slots) > 0, str(len(slots)))
 
         # ---------- auth ----------
-        admin = token(client, "admin@vijayvargiiyahospital.in", "Admin@123")
+        admin = token(client, "admin@vijayvargiyahospital.in", "Admin@123")
         check("admin login", bool(admin))
-        reception = token(client, "reception@vijayvargiiyahospital.in", "Reception@123")
+        reception = token(client, "reception@vijayvargiyahospital.in", "Reception@123")
         check("reception login", bool(reception))
-        accountant = token(client, "accounts@vijayvargiiyahospital.in", "Accounts@123")
+        accountant = token(client, "accounts@vijayvargiyahospital.in", "Accounts@123")
         check("accountant login", bool(accountant))
-        doctor_tk = token(client, "dr.arjunmehra@vijayvargiiyahospital.in", "Doctor@123")
+        doctor_tk = token(client, "dr.arjunmehra@vijayvargiyahospital.in", "Doctor@123")
         check("doctor login", bool(doctor_tk))
         patient = token(client, "ramesh.yadav@example.com", "Patient@123")
         check("patient login", bool(patient))
-        bad = client.post("/api/v1/auth/login", json={"email": "admin@vijayvargiiyahospital.in",
+        bad = client.post("/api/v1/auth/login", json={"email": "admin@vijayvargiyahospital.in",
                                                       "password": "wrong"})
         check("bad password rejected", bad.status_code == 401)
         me = client.get("/api/v1/auth/me", headers=hdr(admin)).json()
@@ -79,13 +79,13 @@ def main() -> int:
             "phone": "9812345678", "password": "Test@12345", "role": "PATIENT", "city": "Jaipur"})
         check("patient self-registration", reg.status_code == 201, reg.text[:120])
         forgot = client.post("/api/v1/auth/forgot-password",
-                             json={"email": "admin@vijayvargiiyahospital.in"}).json()
+                             json={"email": "admin@vijayvargiyahospital.in"}).json()
         check("forgot password issues token", bool(forgot.get("reset_token")))
         if forgot.get("reset_token"):
             reset = client.post("/api/v1/auth/reset-password",
                                 json={"token": forgot["reset_token"], "new_password": "NewAdmin@123"})
             check("reset password works", reset.status_code == 200, reset.text[:120])
-            relogin = token(client, "admin@vijayvargiiyahospital.in", "NewAdmin@123")
+            relogin = token(client, "admin@vijayvargiyahospital.in", "NewAdmin@123")
             check("login with new password", bool(relogin))
             back = client.post("/api/v1/auth/change-password", headers=hdr(relogin), json={
                 "current_password": "NewAdmin@123", "new_password": "Admin@123"})

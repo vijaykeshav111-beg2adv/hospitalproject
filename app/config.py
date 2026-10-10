@@ -145,7 +145,7 @@ class Settings:
     smtp_port: int = _int("SMTP_PORT", 587)
     smtp_user: str = os.getenv("SMTP_USER", "")
     smtp_password: str = os.getenv("SMTP_PASSWORD", "")
-    email_from: str = os.getenv("EMAIL_FROM", "no-reply@vijayvargiiyahospital.in")
+    email_from: str = os.getenv("EMAIL_FROM", "no-reply@vijayvargiyahospital.in")
 
     # --- AI: Groq only ---
     ai_provider: str = "groq"

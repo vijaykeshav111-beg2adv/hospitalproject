@@ -22,10 +22,10 @@ USE `vijay_vargiya_hospital`;
 """
 
 STAFF = [
-    ("Vijay Vargiya", "superadmin@vijayvargiiyahospital.in", "SUPER_ADMIN", "SuperAdmin@123", "9000000001"),
-    ("Hospital Admin", "admin@vijayvargiiyahospital.in", "ADMIN", "Admin@123", "9000000002"),
-    ("Front Desk - Ritu", "reception@vijayvargiiyahospital.in", "RECEPTIONIST", "Reception@123", "9000000003"),
-    ("Accounts - Mahesh", "accounts@vijayvargiiyahospital.in", "ACCOUNTANT", "Accounts@123", "9000000004"),
+    ("Vijay Vargiya", "superadmin@vijayvargiyahospital.in", "SUPER_ADMIN", "SuperAdmin@123", "9000000001"),
+    ("Hospital Admin", "admin@vijayvargiyahospital.in", "ADMIN", "Admin@123", "9000000002"),
+    ("Front Desk - Ritu", "reception@vijayvargiyahospital.in", "RECEPTIONIST", "Reception@123", "9000000003"),
+    ("Accounts - Mahesh", "accounts@vijayvargiyahospital.in", "ACCOUNTANT", "Accounts@123", "9000000004"),
 ]
 
 SPECIALTIES = [
@@ -246,14 +246,14 @@ def export(path: str = "sql/03_seed.sql") -> list[str]:
     # ------------------------------------------------------------------ 4. DOCTORS
     sql.append("\n-- demo doctor logins (password: Doctor@123) ---\n")
     doctors = [
-        ("Dr Arjun Mehra", "dr.arjunmehra@vijayvargiiyahospital.in", "GENMED", 500, "MBBS, MD (Internal Medicine)", 14),
-        ("Dr Nidhi Sharma", "dr.nidhisharma@vijayvargiiyahospital.in", "CARDIOLOGY", 900, "MBBS, MD, DM (Cardiology)", 18),
-        ("Dr Rakesh Choudhary", "dr.rakeshchoudhary@vijayvargiiyahospital.in", "ORTHO", 700, "MBBS, MS (Orthopaedics)", 12),
-        ("Dr Priya Agarwal", "dr.priyaagarwal@vijayvargiiyahospital.in", "DERMA", 600, "MBBS, MD (Dermatology)", 9),
-        ("Dr Sameer Khan", "dr.sameerkhan@vijayvargiiyahospital.in", "PEDIA", 600, "MBBS, MD (Paediatrics)", 15),
-        ("Dr Anjali Rathore", "dr.anjalirathore@vijayvargiiyahospital.in", "GYNAE", 800, "MBBS, MS (Obs & Gynae)", 16),
-        ("Dr Vikas Jain", "dr.vikasjain@vijayvargiiyahospital.in", "ENT", 600, "MBBS, MS (ENT)", 11),
-        ("Dr Meena Kumari", "dr.meenakumari@vijayvargiiyahospital.in", "NEURO", 1000, "MBBS, MD, DM (Neurology)", 13),
+        ("Dr Arjun Mehra", "dr.arjunmehra@vijayvargiyahospital.in", "GENMED", 500, "MBBS, MD (Internal Medicine)", 14),
+        ("Dr Nidhi Sharma", "dr.nidhisharma@vijayvargiyahospital.in", "CARDIOLOGY", 900, "MBBS, MD, DM (Cardiology)", 18),
+        ("Dr Rakesh Choudhary", "dr.rakeshchoudhary@vijayvargiyahospital.in", "ORTHO", 700, "MBBS, MS (Orthopaedics)", 12),
+        ("Dr Priya Agarwal", "dr.priyaagarwal@vijayvargiyahospital.in", "DERMA", 600, "MBBS, MD (Dermatology)", 9),
+        ("Dr Sameer Khan", "dr.sameerkhan@vijayvargiyahospital.in", "PEDIA", 600, "MBBS, MD (Paediatrics)", 15),
+        ("Dr Anjali Rathore", "dr.anjalirathore@vijayvargiyahospital.in", "GYNAE", 800, "MBBS, MS (Obs & Gynae)", 16),
+        ("Dr Vikas Jain", "dr.vikasjain@vijayvargiyahospital.in", "ENT", 600, "MBBS, MS (ENT)", 11),
+        ("Dr Meena Kumari", "dr.meenakumari@vijayvargiyahospital.in", "NEURO", 1000, "MBBS, MD, DM (Neurology)", 13),
     ]
     doctor_digest = hash_password("Doctor@123")
     for idx, (name, email, code, fee, quals, exp) in enumerate(doctors, start=1):
