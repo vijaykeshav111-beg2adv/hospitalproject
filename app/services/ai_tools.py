@@ -13,7 +13,7 @@ import random
 import string
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session
 
 from .. import models
@@ -271,6 +271,35 @@ def search_doctors(db: Session, ctx: ToolContext, specialty_id: int | None = Non
             .order_by(models.Slot.slot_date, models.Slot.start_time)
             .limit(1)
         )
+        # Fetch only real written reviews from the existing reviews table.
+        # We intentionally do not invent, paraphrase, or generate review text.
+        review_rows = db.execute(
+            text(
+                "SELECT rating, comment, status, created_at "
+                "FROM reviews "
+                "WHERE doctor_id = :doctor_id "
+                "AND comment IS NOT NULL "
+                "AND TRIM(comment) <> '' "
+                "ORDER BY created_at DESC "
+                "LIMIT 3"
+            ),
+            {"doctor_id": doc.id},
+        ).mappings().all()
+
+        # Only expose moderated/approved review text. If a deployment uses a
+        # different status vocabulary, the row is safely excluded rather than
+        # displaying an unverified review.
+        verified_reviews = [
+            {
+                "rating": int(row["rating"]),
+                "comment": str(row["comment"]).strip(),
+                "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+            }
+            for row in review_rows
+            if str(row["status"] or "").upper() in {"APPROVED", "PUBLISHED", "VERIFIED", "ACTIVE"}
+            and 1 <= int(row["rating"]) <= 5
+        ]
+
         out.append({
             "id": doc.id,
             "doctor_code": doc.doctor_code,
@@ -283,6 +312,8 @@ def search_doctors(db: Session, ctx: ToolContext, specialty_id: int | None = Non
             "fee": float(doc.consultation_fee or 0),
             "rating": float(doc.rating_avg or 0),
             "rating_count": doc.rating_count or 0,
+            "reviews": verified_reviews,
+            "review_count": len(verified_reviews),
             "next_available": (
                 f"{next_slot.slot_date.isoformat()} {next_slot.start_time.strftime('%H:%M')}"
                 if next_slot else None
