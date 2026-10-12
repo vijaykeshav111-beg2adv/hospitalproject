@@ -1,0 +1,125 @@
+
+{% extends "base.html" %}
+{% block title %}MCP Chatbot | Vijay Vargiya Hospital{% endblock %}
+{% block content %}
+<div class="container" style="max-width:1000px;margin:28px auto;">
+  <div class="card" style="overflow:hidden;">
+    <div style="padding:20px;border-bottom:1px solid #e5e7eb;">
+      <h2 style="margin:0;">Hospital MCP Chatbot</h2>
+      <p style="margin:8px 0 0;color:#64748b;">Separate MCP learning chatbot. The existing hospital chatbot is unchanged.</p>
+      <p style="margin:6px 0 0;font-size:12px;color:#64748b;">Read-only demo: doctor directory, specialties, public statistics and availability lookup. Availability checks do not book appointments.</p>
+    </div>
+
+    <div id="messages" aria-live="polite" style="min-height:360px;max-height:560px;overflow-y:auto;padding:18px;background:#f8fafc;">
+      <div style="padding:12px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;max-width:85%;">
+        Ask about doctors, specialties, hospital statistics, or available slots. For slots, include a date such as 2026-10-14.
+      </div>
+    </div>
+
+    <form id="chatForm" style="display:flex;gap:8px;padding:14px;border-top:1px solid #e2e8f0;">
+      <textarea id="message" required maxlength="1500" rows="2" placeholder="Ask the MCP chatbot..." style="flex:1;resize:vertical;padding:12px;border:1px solid #cbd5e1;border-radius:10px;font:inherit;"></textarea>
+      <button id="send" class="btn btn-primary" type="submit">Send</button>
+    </form>
+
+    <div id="status" role="status" style="padding:0 14px 14px;color:#64748b;font-size:12px;"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const form = document.getElementById('chatForm');
+const input = document.getElementById('message');
+const messages = document.getElementById('messages');
+const statusBox = document.getElementById('status');
+const send = document.getElementById('send');
+
+// Reuse the same conversation ID for each message in this page session.
+let conversationId = null;
+
+function addMessage(label, text, isUser = false) {
+  const wrapper = document.createElement('div');
+
+  wrapper.style.cssText =
+    `margin:10px 0;padding:12px;border-radius:10px;white-space:pre-wrap;overflow-wrap:anywhere;max-width:90%;${
+      isUser
+        ? 'margin-left:auto;background:#dbeafe;'
+        : 'background:#fff;border:1px solid #e2e8f0;'
+    }`;
+
+  const title = document.createElement('strong');
+  title.textContent = label;
+
+  const body = document.createElement('div');
+  body.textContent = text;
+
+  wrapper.append(title, body);
+  messages.appendChild(wrapper);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+
+  const message = input.value.trim();
+  if (!message) return;
+
+  addMessage('You', message, true);
+  input.value = '';
+  send.disabled = true;
+  statusBox.textContent = 'Checking authorized MCP tools and verified data...';
+
+  try {
+    const response = await fetch('/api/v1/mcp-chat/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        message: message,
+        conversation_id: conversationId
+      })
+    });
+
+    let result;
+
+    try {
+      result = await response.json();
+    } catch {
+      result = null;
+    }
+
+    if (!response.ok) {
+      throw new Error(result?.detail || 'Request failed.');
+    }
+
+    // Save the ID returned by the backend for the next message.
+    if (result?.conversation_id) {
+      conversationId = result.conversation_id;
+    }
+
+    addMessage(
+      result.status === 'DATA_UNAVAILABLE'
+        ? 'Data unavailable'
+        : 'MCP assistant',
+      result.answer || 'No answer was returned.'
+    );
+
+    statusBox.textContent =
+      `Status: ${result.status}` +
+      (result.tool ? ` | Tool: ${result.tool}` : '');
+  } catch (error) {
+    addMessage(
+      'Request failed',
+      error.message || 'Unable to contact the MCP chatbot.'
+    );
+
+    statusBox.textContent = 'The request could not be completed.';
+  } finally {
+    send.disabled = false;
+    input.focus();
+  }
+});
+</script>
+{% endblock %}

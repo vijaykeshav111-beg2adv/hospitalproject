@@ -167,12 +167,12 @@ PAGE_ROLES: dict[str, tuple[str, ...]] = {
     "/ui/patients":     ("DOCTOR", "RECEPTIONIST", "ADMIN"),
     "/ui/appointments": ("PATIENT", "DOCTOR", "RECEPTIONIST", "ADMIN"),
     "/ui/ai-chat":      ("PATIENT", "DOCTOR", "RECEPTIONIST", "ACCOUNTANT", "ADMIN"),
+    "/ui/mcp-chatbot":  ("PATIENT", "DOCTOR", "RECEPTIONIST", "ACCOUNTANT", "ADMIN"),
     "/ui/ai-monitor":   ("ADMIN",),
     "/ui/security":     ("ADMIN",),
     "/ui/access":       ("ADMIN",),
     "/ui/system":       ("ADMIN",),
 }
-
 PAGE_LABELS: dict[str, str] = {
     "/ui/super-admin":  "Super Admin dashboard - every role's data, security summary, system health",
     "/ui/admin":        "Hospital dashboard - today's OPD, revenue, staff, reviews, analytics",
@@ -185,6 +185,7 @@ PAGE_LABELS: dict[str, str] = {
     "/ui/patients":     "Patient master - search, register, history",
     "/ui/appointments": "Appointment list - today / upcoming / past",
     "/ui/ai-chat":      "AI front desk chat",
+    "/ui/mcp-chatbot":  "MCP hospital chatbot",
     "/ui/ai-monitor":   "AI monitor - conversations, routing, escalations, tools, safety",
     "/ui/security":     "Audit log, login activity, sessions, security summary",
     "/ui/access":       "This page - role x permission matrix",

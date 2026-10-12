@@ -20,6 +20,7 @@ from .services import jobs
 from .web import UILoginRequired, home_for_role
 from .web import router as web_router
 from .routers import legacy_ml
+from .routers import mcp_chat
 
 logging.basicConfig(
     level=logging.INFO,
@@ -103,6 +104,7 @@ def create_app() -> FastAPI:
         notifications.router, notifications.wa_router, ai.router, ai_files.router,
         analytics.router,
         analytics.admin_router, admin.router,
+        mcp_chat.router,
     ]
     for r in api_routers:
         app.include_router(r, prefix="/api/v1")

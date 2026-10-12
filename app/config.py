@@ -147,7 +147,11 @@ class Settings:
     smtp_password: str = os.getenv("SMTP_PASSWORD", "")
     email_from: str = os.getenv("EMAIL_FROM", "no-reply@vijayvargiyahospital.in")
     hospital_timezone: str = os.getenv("HOSPITAL_TIMEZONE", "Asia/Kolkata")
-
+    # --- MCP services ---
+    mcp_hospital_url: str = os.getenv(
+        "MCP_HOSPITAL_URL",
+        "http://127.0.0.1:8010/mcp",
+    )
     # --- AI: Groq only ---
     ai_provider: str = "groq"
     groq_api_key: str = os.getenv("GROQ_API_KEY", "")

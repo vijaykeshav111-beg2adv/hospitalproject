@@ -458,3 +458,20 @@ def system(
         "system.html",
         _ctx(request, "system"),
     )
+# ------------------------------------------------------------------
+# MCP CHATBOT
+# ------------------------------------------------------------------
+
+@router.get("/mcp-chatbot", response_class=HTMLResponse)
+def mcp_chatbot(
+    request: Request,
+    _: CurrentUser = Depends(
+        page_guard(*rbac.PAGE_ROLES["/ui/mcp-chatbot"])
+    ),
+):
+    """Separate MCP chatbot page; existing AI front desk remains unchanged."""
+    return templates.TemplateResponse(
+        request,
+        "mcp_chatbot.html",
+        _ctx(request, "mcp_chatbot"),
+    )
