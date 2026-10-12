@@ -12,7 +12,7 @@ from fastmcp import FastMCP
 from sqlalchemy import func, select
 
 from app.database import SessionLocal
-from app.models import Appointment, Doctor, Slot, Specialty
+from app.models import Appointment, Doctor, DoctorSchedule, Slot, Specialty
 
 mcp = FastMCP("Vijay Vargiya Hospital Read-only MCP")
 
@@ -108,6 +108,92 @@ def get_public_hospital_stats() -> dict:
         return {"date": today.isoformat(), "active_doctors": doctors,
                 "active_specialties": specialties, "available_slots_today": available_slots,
                 "pending_or_confirmed_appointments_today": appointments_today}
+
+DAY_NAMES = {
+    0: "Monday",
+    1: "Tuesday",
+    2: "Wednesday",
+    3: "Thursday",
+    4: "Friday",
+    5: "Saturday",
+    6: "Sunday",
+}
+
+
+@mcp.tool()
+def get_doctor_working_hours(
+    doctor_id: int | None = None,
+    doctor_name: str = "",
+) -> dict:
+    """Get active weekly working hours, breaks, and slot capacity for a doctor."""
+
+    if doctor_id is None and not doctor_name.strip():
+        return {
+            "success": False,
+            "error": "Provide either doctor_id or doctor_name."
+        }
+
+    with SessionLocal() as db:
+        stmt = (
+            select(DoctorSchedule, Doctor)
+            .join(Doctor, DoctorSchedule.doctor_id == Doctor.id)
+            .where(
+                Doctor.is_active.is_(True),
+                DoctorSchedule.is_active.is_(True),
+            )
+        )
+
+        if doctor_id is not None:
+            stmt = stmt.where(Doctor.id == doctor_id)
+        else:
+            stmt = stmt.where(
+                Doctor.full_name.ilike(f"%{doctor_name.strip()}%")
+            )
+
+        rows = db.execute(
+            stmt.order_by(
+                Doctor.full_name,
+                DoctorSchedule.day_of_week,
+                DoctorSchedule.start_time,
+            )
+        ).all()
+
+        if not rows:
+            return {
+                "success": True,
+                "count": 0,
+                "message": "No active working schedule found for this doctor.",
+                "schedules": [],
+            }
+
+        schedules = []
+        for schedule, doctor in rows:
+            schedules.append({
+                "doctor_id": doctor.id,
+                "doctor_name": doctor.full_name,
+                "day_of_week": schedule.day_of_week,
+                "day": DAY_NAMES.get(
+                    schedule.day_of_week, "Unknown"
+                ),
+                "start_time": schedule.start_time.strftime("%H:%M"),
+                "end_time": schedule.end_time.strftime("%H:%M"),
+                "break_start": (
+                    schedule.break_start.strftime("%H:%M")
+                    if schedule.break_start else None
+                ),
+                "break_end": (
+                    schedule.break_end.strftime("%H:%M")
+                    if schedule.break_end else None
+                ),
+                "slot_duration_minutes": schedule.slot_duration_minutes,
+                "capacity_per_slot": schedule.capacity_per_slot,
+            })
+
+        return {
+            "success": True,
+            "count": len(schedules),
+            "schedules": schedules,
+        }
 
 
 if __name__ == "__main__":

@@ -1,9 +1,12 @@
+
 """Separate MCP chatbot API. Existing /api/v1/ai/chat is intentionally untouched.
 
-Security policy: authenticated users with ai:chat permission can use only read-only
-public hospital tools. No patient records or write operations are exposed here.
-If MCP/database data cannot be verified, return DATA_UNAVAILABLE and do not call the LLM.
+Security policy:
+- Authenticated users with ai:chat permission can use read-only public hospital tools.
+- No patient records or write operations are exposed here.
+- If MCP/database data cannot be verified, return DATA_UNAVAILABLE.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -22,6 +25,7 @@ from ..deps import CurrentUser, require_permission
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/mcp-chat", tags=["MCP Chatbot"])
+
 # Temporary conversation state, isolated by authenticated user.
 # For production, use a persistent store with expiry and access controls.
 _CONVERSATIONS: dict[str, dict[str, Any]] = {}
@@ -34,13 +38,17 @@ def _new_conversation(user_id: str) -> str:
         "user_id": user_id,
         "stage": "idle",
         "appointment_date": None,
+        "doctor_id": None,
         "options": [],
+        "selected_slot": None,
     }
     return conversation_id
+
 
 class MCPChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=1500)
     conversation_id: str | None = Field(default=None, max_length=100)
+
 
 class MCPChatResponse(BaseModel):
     status: str
@@ -49,94 +57,284 @@ class MCPChatResponse(BaseModel):
     data: Any = None
     conversation_id: str | None = None
 
+
 def _extract_tool_data(result: Any) -> Any:
-    """Normalize FastMCP/MCP SDK results without treating errors as empty data."""
+    """Normalize MCP SDK results without treating errors as empty data."""
     if getattr(result, "is_error", False):
         raise RuntimeError("MCP tool reported an error")
+
     data = getattr(result, "data", None)
     if data is not None:
         return data
-    structured = getattr(result, "structuredContent", None) or getattr(result, "structured_content", None)
+
+    structured = (
+        getattr(result, "structuredContent", None)
+        or getattr(result, "structured_content", None)
+    )
     if structured is not None:
         return structured
+
     content = getattr(result, "content", None)
     if content:
         for block in content:
-            text = getattr(block, "text", None)
-            if text:
+            block_text = getattr(block, "text", None)
+            if block_text:
                 try:
-                    return json.loads(text)
+                    return json.loads(block_text)
                 except json.JSONDecodeError:
-                    return {"text": text}
+                    return {"text": block_text}
+
     raise RuntimeError("MCP result contained no readable data")
 
 
 async def _call_mcp(tool_name: str, arguments: dict[str, Any]) -> Any:
-    # Imported only when this endpoint is called so the main hospital app can
-    # still start without the optional MCP package installed.
+    # Import only when the endpoint is called so the main app can start
+    # without the optional MCP package installed.
     from fastmcp import Client
 
-    endpoint = getattr(settings, "mcp_hospital_url", "http://127.0.0.1:8010/mcp")
+    endpoint = getattr(
+        settings,
+        "mcp_hospital_url",
+        "http://127.0.0.1:8010/mcp",
+    )
+
     async with Client(endpoint) as client:
         result = await client.call_tool(tool_name, arguments)
+
     return _extract_tool_data(result)
 
 
 def _select_tool(message: str) -> tuple[str, dict[str, Any]]:
-    """Small transparent router for the learning demo; no LLM decides access."""
+    """Choose a read-only tool deterministically; no LLM decides access."""
     text = message.strip().lower()
-    if any(word in text for word in ("slot", "available", "availability", "appointment", "book")):
-        import re
-        match = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", text)
-        if not match:
-            # Do not guess a date. Ask the user for it without querying or inventing availability.
+
+    # Extract an explicit doctor ID, if provided.
+    doctor_match = re.search(
+        r"\bdoctor\s*(?:id|number)\s*[:#]?\s*(\d+)\b"
+        r"|\bdoctor\s*#\s*(\d+)\b",
+        text,
+    )
+    doctor_id = None
+
+    if doctor_match:
+        doctor_id = int(
+            next(group for group in doctor_match.groups() if group is not None)
+        )
+
+    # Doctor working hours / weekly schedule lookup.
+    working_hours_phrases = (
+        "working hours",
+        "work hours",
+        "doctor schedule",
+        "doctor's schedule",
+        "doctors schedule",
+        "duty hours",
+        "clinic timings",
+        "doctor timings",
+        "working time",
+        "schedule of",
+        "schedule for",
+    )
+
+    if any(phrase in text for phrase in working_hours_phrases):
+        if doctor_id is not None:
+            return "get_doctor_working_hours", {"doctor_id": doctor_id}
+
+        # Extract a name after "of" or "for", optionally preceded by "Dr".
+        name_match = re.search(
+            r"\b(?:of|for)\s+(?:dr\.?\s*)?"
+            r"([a-z][a-z .'-]{1,60}?)"
+            r"(?=\s+(?:on|for date|doctor id|doctor number)\b|[?.!,]|$)",
+            text,
+        )
+
+        if name_match:
+            doctor_name = name_match.group(1).strip(" .,'-")
+            if doctor_name and doctor_name not in {
+                "the doctor",
+                "a doctor",
+                "doctor",
+            }:
+                return "get_doctor_working_hours", {
+                    "doctor_name": doctor_name,
+                }
+
+        return "NEED_DOCTOR_NAME", {}
+
+    # Availability lookup. This checks slots only; it does not book.
+    availability_words = (
+        "slot",
+        "available",
+        "availability",
+        "appointment",
+        "book",
+    )
+
+    if any(word in text for word in availability_words):
+        date_match = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", text)
+
+        if not date_match:
+            arguments = {}
+            if doctor_id is not None:
+                arguments["doctor_id"] = doctor_id
+            return "NEED_DATE", arguments
+
+        try:
+            requested_date = date.fromisoformat(date_match.group(1))
+        except ValueError:
             return "NEED_DATE", {}
-        return "find_available_slots", {"appointment_date": match.group(1), "limit": 20}
-    if any(word in text for word in ("specialty", "specialties", "department", "departments")):
+
+        if requested_date < date.today():
+            return "INVALID_DATE", {}
+
+        arguments = {
+            "appointment_date": requested_date.isoformat(),
+            "limit": 20,
+        }
+
+        if doctor_id is not None:
+            arguments["doctor_id"] = doctor_id
+
+        return "find_available_slots", arguments
+
+    # Specialty directory.
+    if any(
+        word in text
+        for word in (
+            "specialty",
+            "specialties",
+            "speciality",
+            "specialities",
+            "department",
+            "departments",
+        )
+    ):
         return "list_specialties", {}
-    if any(word in text for word in ("stats", "statistics", "how many doctors", "hospital summary")):
+
+    # Public aggregate statistics.
+    if any(
+        phrase in text
+        for phrase in (
+            "stats",
+            "statistics",
+            "how many doctors",
+            "hospital summary",
+        )
+    ):
         return "get_public_hospital_stats", {}
-    # Default to directory search. Use the original message as a specialty query
-    # only when the user explicitly mentions a known search intent.
+
+    # Default: read-only doctor directory search.
     specialty = ""
-    for term in ("dermatology", "cardiology", "neurology", "orthopedics", "orthopaedics", "pediatrics", "paediatrics"):
+    for term in (
+        "dermatology",
+        "cardiology",
+        "neurology",
+        "orthopedics",
+        "orthopaedics",
+        "pediatrics",
+        "paediatrics",
+    ):
         if term in text:
             specialty = term
             break
-    return "search_doctors", {"specialty": specialty, "limit": 10}
+
+    return "search_doctors", {
+        "specialty": specialty,
+        "limit": 10,
+    }
 
 
 def _verified_fallback(tool: str, data: Any) -> str:
-    """Deterministic response generated only from successfully retrieved tool data."""
+    """Build a deterministic answer from successfully retrieved tool data."""
+    if not isinstance(data, dict):
+        return "The hospital data service returned an unexpected result."
+
     if tool == "list_specialties":
-        rows = data.get("specialties", []) if isinstance(data, dict) else []
+        rows = data.get("specialties", [])
         if not rows:
-            return "The database query succeeded, but no active specialties were found."
+            return (
+                "The database query succeeded, but no active "
+                "specialties were found."
+            )
+
         return "Active specialties returned by the hospital database:\n" + "\n".join(
-            f"- {x.get('name', 'Unnamed specialty')}: consultation fee {x.get('consultation_fee', 'not listed')}"
-            for x in rows
+            f"- {item.get('name', 'Unnamed specialty')}: "
+            f"consultation fee "
+            f"{item.get('consultation_fee', 'not listed')}"
+            for item in rows
         )
+
     if tool == "search_doctors":
-        rows = data.get("doctors", []) if isinstance(data, dict) else []
+        rows = data.get("doctors", [])
         if not rows:
             return "No matching active doctors were found in the hospital database."
+
         return "Doctors found in the hospital database:\n" + "\n".join(
-            f"- {x.get('name', 'Name not listed')} | {x.get('specialty', 'Specialty not listed')} | fee: {x.get('consultation_fee', 'not listed')}"
-            for x in rows
+            f"- {item.get('name', 'Name not listed')} | "
+            f"{item.get('specialty', 'Specialty not listed')} | "
+            f"fee: {item.get('consultation_fee', 'not listed')}"
+            for item in rows
         )
+
     if tool == "find_available_slots":
-        rows = data.get("slots", []) if isinstance(data, dict) else []
+        rows = data.get("slots", [])
         if not rows:
-            return f"No available slots were returned for {data.get('date', 'the requested date')}. This is not a booking."
-        return "Slots currently returned by the database (not reserved):\n" + "\n".join(
-            f"- {x.get('date', data.get('date', ''))} {x.get('start_time', '')}-{x.get('end_time', '')}: {x.get('doctor_name', 'Doctor not listed')} ({x.get('specialty', 'specialty not listed')})"
-            for x in rows
+            return (
+                f"No available slots were returned for "
+                f"{data.get('date', 'the requested date')}. "
+                "This is not a booking."
+            )
+
+        return (
+            "Slots currently returned by the database (not reserved):\n"
+            + "\n".join(
+                f"- {item.get('date', data.get('date', ''))} "
+                f"{item.get('start_time', '')}-{item.get('end_time', '')}: "
+                f"{item.get('doctor_name', 'Doctor not listed')} "
+                f"({item.get('specialty', 'specialty not listed')})"
+                for item in rows
+            )
         )
+
+    if tool == "get_doctor_working_hours":
+        rows = data.get("schedules", [])
+        if not rows:
+            return "No active working hours were found for this doctor."
+
+        lines = []
+        for item in rows:
+            start = item.get("start_time", "Not listed")
+            end = item.get("end_time", "Not listed")
+            break_start = item.get("break_start")
+            break_end = item.get("break_end")
+
+            line = (
+                f"- {item.get('doctor_name', 'Doctor')}: "
+                f"{item.get('day', 'Day not listed')}, "
+                f"{start}-{end}"
+            )
+
+            if break_start and break_end:
+                line += f", break {break_start}-{break_end}"
+
+            line += (
+                f", slot duration "
+                f"{item.get('slot_duration_minutes', 'not listed')} minutes"
+                f", capacity "
+                f"{item.get('capacity_per_slot', 'not listed')}"
+            )
+            lines.append(line)
+
+        return "Verified doctor working hours:\n" + "\n".join(lines)
+
     if tool == "get_public_hospital_stats":
         return "Verified aggregate hospital statistics:\n" + "\n".join(
-            f"- {k.replace('_', ' ')}: {v}" for k, v in data.items()
+            f"- {key.replace('_', ' ')}: {value}"
+            for key, value in data.items()
         )
+
     return "The hospital database returned verified information."
+
 
 def _get_conversation(
     conversation_id: str | None,
@@ -158,35 +356,66 @@ def _get_conversation(
 
     new_id = _new_conversation(user_id)
     return new_id, _CONVERSATIONS[new_id]
-async def _llm_polish(message: str, tool: str, data: Any, fallback: str) -> str:
-    """Optional Groq wording layer; receives only a successful, read-only tool result."""
+
+
+async def _llm_polish(
+    message: str,
+    tool: str,
+    data: Any,
+    fallback: str,
+) -> str:
+    """Optional Groq wording layer; receives only a successful read-only result."""
     if not settings.groq_api_key:
         return fallback
+
     try:
         from groq import Groq
+
         payload = json.dumps(data, ensure_ascii=False, default=str)
+
         def call() -> str:
-            client = Groq(api_key=settings.groq_api_key, timeout=settings.groq_timeout_seconds)
+            client = Groq(
+                api_key=settings.groq_api_key,
+                timeout=settings.groq_timeout_seconds,
+            )
             response = client.chat.completions.create(
                 model=settings.groq_model,
                 temperature=0,
                 max_tokens=500,
                 messages=[
-                    {"role": "system", "content": (
-                        "You are the wording layer for a hospital MCP chatbot. Use ONLY the supplied tool result. "
-                        "Never infer missing facts, invent doctors, prices, appointment slots, medical advice, or database status. "
-                        "If a field is absent, say it was not provided. Do not claim an appointment was booked. "
-                        "Answer briefly in the user's language."
-                    )},
-                    {"role": "user", "content": f"Question: {message}\nTool: {tool}\nVerified tool result JSON: {payload}"},
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are the wording layer for a hospital MCP chatbot. "
+                            "Use ONLY the supplied tool result. Never infer missing "
+                            "facts, invent doctors, prices, appointment slots, medical "
+                            "advice, or database status. If a field is absent, say "
+                            "it was not provided. Do not claim an appointment was "
+                            "booked. Answer briefly in the user's language."
+                            "Do not use Markdown formatting such as **bold**, "
+                            "`code`, or Markdown headings. Return plain text only. "
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Question: {message}\n"
+                            f"Tool: {tool}\n"
+                            f"Verified tool result JSON: {payload}"
+                        ),
+                    },
                 ],
             )
-            text = response.choices[0].message.content
-            return text.strip() if text else fallback
+            answer = response.choices[0].message.content
+            return answer.strip() if answer else fallback
+
         answer = await asyncio.to_thread(call)
         return answer or fallback
+
     except Exception:
-        log.exception("MCP chatbot LLM wording failed; using deterministic verified response")
+        log.exception(
+            "MCP chatbot LLM wording failed; using verified deterministic response"
+        )
         return fallback
 
 
@@ -196,8 +425,12 @@ async def mcp_chat(
     user: CurrentUser = Depends(require_permission("ai:chat")),
 ):
     if user.role not in {
-        "PATIENT", "DOCTOR", "RECEPTIONIST",
-        "ACCOUNTANT", "ADMIN", "SUPER_ADMIN",
+        "PATIENT",
+        "DOCTOR",
+        "RECEPTIONIST",
+        "ACCOUNTANT",
+        "ADMIN",
+        "SUPER_ADMIN",
     }:
         raise HTTPException(
             status_code=403,
@@ -205,12 +438,19 @@ async def mcp_chat(
         )
 
     conversation_id, state = _get_conversation(
-        payload.conversation_id, str(user.id)
+        payload.conversation_id,
+        str(user.id),
     )
+
     message = payload.message.strip()
     text = message.lower()
 
-    def reply(status: str, answer: str, tool=None, data=None):
+    def reply(
+        status: str,
+        answer: str,
+        tool: str | None = None,
+        data: Any = None,
+    ) -> MCPChatResponse:
         return MCPChatResponse(
             status=status,
             answer=answer,
@@ -219,7 +459,7 @@ async def mcp_chat(
             conversation_id=conversation_id,
         )
 
-    # A date supplied after the chatbot requested one.
+    # Handle the date requested in a previous turn.
     date_match = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", text)
 
     if state["stage"] in {"need_date", "need_doctor_date"} and date_match:
@@ -237,12 +477,12 @@ async def mcp_chat(
                 "Please choose today or a future date in YYYY-MM-DD format.",
             )
 
-        arguments = {
+        arguments: dict[str, Any] = {
             "appointment_date": requested_date.isoformat(),
             "limit": 20,
         }
 
-        if state["stage"] == "need_doctor_date" and state.get("doctor_id"):
+        if state.get("doctor_id") is not None:
             arguments["doctor_id"] = state["doctor_id"]
 
         tool = "find_available_slots"
@@ -265,6 +505,7 @@ async def mcp_chat(
             state["doctor_id"] = selected["doctor_id"]
             state["stage"] = "need_doctor_date"
             state["options"] = []
+
             return reply(
                 "NEED_MORE_INFORMATION",
                 f"You selected {selected.get('name', 'this doctor')} "
@@ -277,11 +518,13 @@ async def mcp_chat(
         if state["stage"] == "select_slot":
             state["selected_slot"] = selected
             state["stage"] = "slot_selected"
+
             return reply(
                 "SUCCESS",
                 "You selected this available slot:\n"
                 f"{selected.get('date', state.get('appointment_date', ''))} "
-                f"{selected.get('start_time', '')}-{selected.get('end_time', '')}, "
+                f"{selected.get('start_time', '')}-"
+                f"{selected.get('end_time', '')}, "
                 f"{selected.get('doctor_name', 'Doctor not listed')}.\n"
                 "This slot has NOT been reserved and no appointment has been booked.",
                 tool="find_available_slots",
@@ -294,25 +537,48 @@ async def mcp_chat(
         )
 
     else:
-        # A booking request without a date starts a date-selection step.
-        if any(word in text for word in ("book appointment", "book an appointment")):
+        # Handle an explicit booking request without a date.
+        if any(
+            phrase in text
+            for phrase in ("book appointment", "book an appointment")
+        ) and not date_match:
             state["stage"] = "need_date"
             state["options"] = []
+            state["doctor_id"] = None
+
             return reply(
                 "NEED_MORE_INFORMATION",
                 "What date would you prefer? Please use YYYY-MM-DD. "
-                "I can check availability, but booking is not enabled in this read-only demo.",
+                "I can check availability, but booking is not enabled "
+                "in this read-only demo.",
             )
 
         tool, arguments = _select_tool(message)
 
+        if tool == "NEED_DOCTOR_NAME":
+            state["stage"] = "idle"
+            state["options"] = []
+            return reply(
+                "NEED_MORE_INFORMATION",
+                "Please provide the doctor's name or ID. "
+                "Example: Show working hours of doctor ID 1",
+            )
+
         if tool == "NEED_DATE":
             state["stage"] = "need_date"
             state["options"] = []
+            state["doctor_id"] = arguments.get("doctor_id")
+
             return reply(
                 "NEED_MORE_INFORMATION",
                 "Please provide the date in YYYY-MM-DD format. "
                 "I will check availability, not book an appointment.",
+            )
+
+        if tool == "INVALID_DATE":
+            return reply(
+                "NEED_MORE_INFORMATION",
+                "Please choose today or a future date in YYYY-MM-DD format.",
             )
 
     try:
@@ -320,19 +586,21 @@ async def mcp_chat(
     except Exception:
         log.exception(
             "MCP tool/database call failed for tool=%s user_id=%s",
-            tool, user.id,
+            tool,
+            user.id,
         )
         return reply(
             "DATA_UNAVAILABLE",
-            "I cannot verify this information because the hospital data service "
-            "is unavailable. Please try again later.",
+            "I cannot verify this information because the hospital data "
+            "service is unavailable. Please try again later.",
             tool=tool,
         )
 
     if not isinstance(data, dict) or data.get("success") is False:
         return reply(
             "DATA_UNAVAILABLE",
-            "The hospital data service did not return a valid result. Please try again.",
+            "The hospital data service did not return a valid result. "
+            "Please try again.",
             tool=tool,
         )
 
