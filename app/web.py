@@ -475,3 +475,22 @@ def mcp_chatbot(
         "mcp_chatbot.html",
         _ctx(request, "mcp_chatbot"),
     )
+
+
+# ------------------------------------------------------------------
+# MCP CONTROL CENTER + GROUNDED CHAT (additive; keeps /mcp-chatbot)
+# ------------------------------------------------------------------
+@router.get("/mcp", response_class=HTMLResponse)
+def mcp_dashboard(
+    request: Request,
+    _: CurrentUser = Depends(page_guard(*rbac.PAGE_ROLES["/ui/mcp"])),
+):
+    return templates.TemplateResponse(request, "mcp_dashboard.html", _ctx(request, "mcp"))
+
+
+@router.get("/mcp-chat", response_class=HTMLResponse)
+def mcp_chat(
+    request: Request,
+    _: CurrentUser = Depends(page_guard(*rbac.PAGE_ROLES["/ui/mcp-chat"])),
+):
+    return templates.TemplateResponse(request, "mcp_chat.html", _ctx(request, "mcp_chat"))

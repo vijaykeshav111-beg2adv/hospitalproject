@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}MCP Control Center{% endblock %}
+{% block content %}
+<div class="flex-between">
+  <div>
+    <h2 style="margin:0">MCP Control Center</h2>
+    <p class="muted small" style="margin:4px 0 0">
+      10 MCP servers &rarr; 5 USER + 3 ADMIN + 2 SYSTEM &rarr; RBAC &nbsp;|&nbsp;
+      Hallucination control: <b>db not available &rarr; not generate &rarr; no</b>
+    </p>
+  </div>
+  <div class="row">
+    <a class="btn ghost sm" href="/mcp" target="_blank">Open MCP gateway</a>
+    <a class="btn sm" href="/ui/mcp-chat">Open MCP chatbot</a>
+    <button class="btn ghost sm" onclick="loadAll()">Refresh</button>
+  </div>
+</div>
+
+<div id="dbBanner" class="card" style="margin-top:14px;border-left:6px solid var(--line)">
+  <div class="flex-between">
+    <div><b>Database guard</b> <span id="dbState" class="badge">checking…</span>
+      <div class="small muted" id="dbDetail" style="margin-top:6px">Probing MySQL…</div>
+    </div>
+    <div class="small muted">
+      Rule: <code>db not available → not generate → no</code><br>
+      When the DB is down every MCP tool answers <code>"answer":"no"</code> and the
+      chatbot refuses to generate text. Nothing is ever invented.
+    </div>
+  </div>
+</div>
+
+<div class="grid g3" style="margin-top:14px">
+  <div class="card"><h3>RBAC contract</h3>
+    <div id="rbacCounts" class="small">Loading…</div>
+    <table style="margin-top:10px">
+      <thead><tr><th>Tier</th><th>Servers</th><th>Hospital roles</th></tr></thead>
+      <tbody id="rbacBody"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="card"><h3>Your access</h3>
+    <div id="whoBox" class="small">Loading…</div>
+    <div class="small muted" style="margin-top:8px">
+      User&nbsp;&rarr;&nbsp;5 USER servers &middot;
+      Admin&nbsp;&rarr;&nbsp;+3 ADMIN servers &middot;
+      Super Admin&nbsp;&rarr;&nbsp;all 10 (SYSTEM)
+    </div>
+  </div>
+  <div class="card"><h3>Links</h3>
+    <div class="small">
+      <a href="/mcp" target="_blank">/mcp</a> &mdash; gateway index (all 10 endpoints)<br>
+      <a href="/mcp/api/status" target="_blank">/mcp/api/status</a> &mdash; live status JSON<br>
+      <a href="/mcp/docs" target="_blank">/mcp/docs</a> &mdash; gateway API docs<br>
+      <a href="/ui/mcp-chat">/ui/mcp-chat</a> &mdash; grounded chatbot
+    </div>
+    <div class="small muted" style="margin-top:8px">
+      MCP clients (Claude Desktop, Cursor, VS Code) connect to:
+      <code>/mcp/servers/&lt;key&gt;/mcp</code>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <h3>The 10 MCP servers</h3>
+  <div id="servers" class="small muted">Loading…</div>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <h3>Tool playground</h3>
+  <p class="muted small">
+    Directly invoke any tool through the same guarded pipeline (RBAC + hallucination control + audit).
+  </p>
+  <div class="row" style="flex-wrap:wrap;gap:8px">
+    <select id="playServer" onchange="fillTools()" style="max-width:220px"></select>
+    <select id="playTool" style="max-width:240px"></select>
+    <input id="playArgs" placeholder='arguments JSON, e.g. {"patient_id": 1}' style="min-width:280px;flex:1"/>
+    <button class="btn" onclick="runTool()">Run tool</button>
+  </div>
+  <pre id="playOut" class="small" style="background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px;max-height:320px;overflow:auto">…</pre>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <h3>Standalone server ports</h3>
+  <div id="ports" class="small muted">Loading…</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+if (guard()) loadAll();
+
+/* ---- helpers: call the MCP gateway with the hospital JWT ---- */
+async function mcp(path, opts = {}) {
+  const headers = Object.assign({'Content-Type': 'application/json'},
+                   Auth.token() ? {'Authorization': 'Bearer ' + Auth.token()} : {});
+  const res = await fetch('/mcp' + path, Object.assign({}, opts, {headers}));
+  const text = await res.text();
+  try { return JSON.parse(text); } catch (e) { return {detail: text}; }
+}
+
+const TIER_CLS = {USER:'ok', ADMIN:'info', SYSTEM:'warn'};
+
+async function loadAll() {
+  try {
+    const st = await mcp('/api/status');
+    renderDb(st.db || {ok:false, detail:'no status'});
+    renderRbac(st.rbac || {});
+    renderWho(st.caller || {});
+    renderPorts(st.standalone_ports || {}, st.endpoints || {});
+  } catch (e) {
+    renderDb({ok:false, detail: e.message});
+  }
+  try {
+    const idx = await mcp('/api/servers');
+    renderServers(idx);
+    const sel = document.getElementById('playServer');
+    sel.innerHTML = (idx.allowed || []).map(s =>
+      `<option value="${s.key}">${s.icons} ${s.title} [${s.tier}]</option>`).join('');
+    fillTools();
+  } catch (e) {
+    document.getElementById('servers').innerHTML = '<span class="badge bad">' + fmt.esc(e.message) + '</span>';
+  }
+}
+
+function renderDb(db) {
+  const box = document.getElementById('dbState');
+  const det = document.getElementById('dbDetail');
+  const ban = document.getElementById('dbBanner');
+  if (db.ok) {
+    box.className = 'badge ok'; box.textContent = 'MySQL UP';
+    det.textContent = 'Tools return database-grounded rows. Every answer is traceable to a source table.';
+    ban.style.borderLeft = '6px solid var(--ok)';
+  } else {
+    box.className = 'badge bad'; box.textContent = 'MySQL DOWN';
+    det.textContent = 'Hallucination control ACTIVE: tools answer "no", the chatbot does not generate. (' +
+      fmt.esc((db.detail || '').slice(0, 160)) + ')';
+    ban.style.borderLeft = '6px solid var(--danger)';
+  }
+}
+
+function renderRbac(rb) {
+  const c = rb.counts || {};
+  document.getElementById('rbacCounts').innerHTML =
+    `<b>${fmt.n((c.USER||0)+(c.ADMIN||0)+(c.SYSTEM||0))} servers</b> &middot; ` +
+    `<span class="badge ok">USER ${c.USER||0}</span> ` +
+    `<span class="badge info">ADMIN ${c.ADMIN||0}</span> ` +
+    `<span class="badge warn">SYSTEM ${c.SYSTEM||0}</span>`;
+  const rows = Object.entries(rb.tiers || {}).map(([tier, t]) => `
+    <tr>
+      <td><span class="badge ${TIER_CLS[tier] || ''}">${tier}</span></td>
+      <td class="small">${(t.servers || []).map(s => '<code>' + s + '</code>').join(' ')}</td>
+      <td class="small">${(t.hospital_roles || []).join(', ')}</td>
+    </tr>`).join('');
+  document.getElementById('rbacBody').innerHTML = rows ||
+    '<tr><td colspan="3" class="muted">No RBAC data</td></tr>';
+}
+
+function renderWho(caller) {
+  document.getElementById('whoBox').innerHTML = `
+    <b>${fmt.esc(caller.subject || '-')}</b><br>
+    role: <code>${fmt.esc(caller.role || '-')}</code><br>
+    tier: <span class="badge ${TIER_CLS[caller.tier] || ''}">${fmt.esc(caller.tier || '-')}</span><br>
+    auth: ${fmt.esc(caller.auth || '-')}`;
+}
+
+function renderPorts(ports, endpoints) {
+  const rows = Object.entries(ports).map(([k, p]) =>
+    `<code>${k}</code> &rarr; <code>http://&lt;host&gt;:${p}/mcp</code>`).join('<br>');
+  const rows2 = Object.entries(endpoints).map(([k, ep]) =>
+    `<code>${k}</code> &rarr; <code>${ep}</code>`).join('<br>');
+  document.getElementById('ports').innerHTML =
+    '<b>Per-server standalone ports:</b><br>' + rows +
+    '<br><br><b>Gateway endpoints (this app):</b><br>' + rows2;
+}
+
+function renderServers(idx) {
+  const box = document.getElementById('servers');
+  const card = s => `
+    <div class="card" style="margin:0">
+      <div class="flex-between">
+        <b>${s.icons || ''} ${fmt.esc(s.title)}</b>
+        <span class="badge ${TIER_CLS[s.tier] || ''}">${s.tier}</span>
+      </div>
+      <div class="small muted" style="margin:6px 0">${fmt.esc(s.summary || '')}</div>
+      <div class="small">${(s.tools || []).map(t => '<code>' + fmt.esc(t) + '</code>').join(' ')}</div>
+      <div class="small" style="margin-top:8px">
+        <a href="/mcp/servers/${s.key}/mcp" target="_blank"><code>/mcp/servers/${s.key}/mcp</code></a>
+      </div>
+    </div>`;
+  const allowed = (idx.allowed || []).map(card).join('');
+  const denied = (idx.denied || []).map(card).join('');
+  box.innerHTML = `
+    <div class="grid g3" style="margin-top:8px">${allowed}</div>
+    ${denied ? `<h4 style="margin:16px 0 0">Locked for your tier (RBAC)</h4>
+      <div class="grid g3" style="margin-top:8px;opacity:.55">${denied}</div>` : ''}
+    <div class="small muted" style="margin-top:10px">
+      You can call <b>${idx.allowed_tools || 0}</b> of <b>${idx.total_tools || 0}</b> tools with this account.
+    </div>`;
+}
+
+function fillTools() {
+  const server = document.getElementById('playServer').value;
+  fetch('/mcp/api/tools', {headers: Auth.token() ? {'Authorization': 'Bearer ' + Auth.token()} : {}})
+    .then(r => r.json())
+    .then(index => {
+      const tools = Object.values(index).filter(t => t.server === server);
+      document.getElementById('playTool').innerHTML = tools.map(t =>
+        `<option value="${t.tool}">${t.tool}${t.write ? ' ✎' : ''}</option>`).join('');
+    });
+}
+
+async function runTool() {
+  const server = document.getElementById('playServer').value;
+  const tool = document.getElementById('playTool').value;
+  let args = {};
+  const raw = document.getElementById('playArgs').value.trim();
+  if (raw) {
+    try { args = JSON.parse(raw); }
+    catch (e) { document.getElementById('playOut').textContent = 'Invalid JSON arguments'; return; }
+  }
+  const out = document.getElementById('playOut');
+  out.textContent = 'Calling ' + server + '.' + tool + ' …';
+  const res = await mcp('/api/tools/call', {method: 'POST',
+    body: JSON.stringify({server, tool, arguments: args})});
+  out.textContent = JSON.stringify(res, null, 2);
+}
+</script>
+{% endblock %}

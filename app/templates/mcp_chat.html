@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}MCP Chatbot{% endblock %}
+{% block content %}
+<div class="flex-between">
+  <div>
+    <h2 style="margin:0">MCP Hospital Chatbot</h2>
+    <p class="muted small" style="margin:4px 0 0">
+      Answers come <b>only</b> from the 10 MCP servers &mdash; live hospital database rows.
+      If the database is unavailable the bot replies <code>no</code> and generates nothing.
+    </p>
+  </div>
+  <div class="row">
+    <span id="dbChip" class="badge">db…</span>
+    <a class="btn ghost sm" href="/ui/mcp">MCP dashboard</a>
+  </div>
+</div>
+
+<div class="grid g3" style="margin-top:14px;grid-template-columns:1fr 320px">
+  <div class="card" style="display:flex;flex-direction:column;min-height:520px">
+    <div id="chatLog" style="flex:1;overflow:auto;display:flex;flex-direction:column;gap:10px;padding:4px 2px"></div>
+    <div class="row" style="margin-top:12px">
+      <input id="chatInput" placeholder="Ask about appointments, doctors, prescriptions, billing…"
+             style="flex:1" onkeydown="if(event.key==='Enter') sendChat()"/>
+      <button class="btn" onclick="sendChat()">Send</button>
+    </div>
+    <div class="small muted" style="margin-top:8px">
+      Safety: no diagnosis / no treatment advice / no prescriptions &middot; emergencies → 108 guidance
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h3>Your access</h3>
+      <div id="whoBox" class="small">…</div>
+      <div class="small muted" style="margin-top:8px">
+        Tier decides which of the 10 MCP servers the bot may call:
+        USER&nbsp;=&nbsp;5 &middot; ADMIN&nbsp;=&nbsp;+3 &middot; SYSTEM&nbsp;=&nbsp;all&nbsp;10
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h3>Try asking</h3>
+      <div class="small" id="suggestions">
+        <button class="btn ghost sm" style="margin:2px" onclick="ask('show today queue')">today queue</button>
+        <button class="btn ghost sm" style="margin:2px" onclick="ask('available slots')">available slots</button>
+        <button class="btn ghost sm" style="margin:2px" onclick="ask('show my appointments')">my appointments</button>
+        <button class="btn ghost sm" style="margin:2px" onclick="ask('list doctors')">doctors</button>
+        <button class="btn ghost sm" style="margin:2px" onclick="ask('outstanding invoices')">outstanding bills</button>
+        <button class="btn ghost sm" style="margin:2px" onclick="ask('daily dashboard')">daily dashboard</button>
+        <button class="btn ghost sm" style="margin:2px" onclick="ask('mcp status')">mcp status</button>
+        <button class="btn ghost sm" style="margin:2px" onclick="ask('help')">help</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h3>How grounding works</h3>
+      <div class="small muted">
+        <b>1.</b> Your message is planned into MCP tool calls (deterministic router).<br>
+        <b>2.</b> Each call is RBAC-checked against your tier.<br>
+        <b>3.</b> Tools answer from MySQL rows only.<br>
+        <b>4.</b> If the DB is down → envelope <code>{"answer":"no","generated":false}</code>
+        → the bot shows the refusal and invents <i>nothing</i>.<br>
+        <b>5.</b> Every reply lists its <code>sources</code> (server.tool).
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+if (guard()) {
+  boot();
+}
+
+async function mcp(path, opts = {}) {
+  const headers = Object.assign({'Content-Type': 'application/json'},
+                   Auth.token() ? {'Authorization': 'Bearer ' + Auth.token()} : {});
+  const res = await fetch('/mcp' + path, Object.assign({}, opts, {headers}));
+  const text = await res.text();
+  try { return JSON.parse(text); } catch (e) { return {detail: text}; }
+}
+
+async function boot() {
+  try {
+    const st = await mcp('/api/status');
+    const chip = document.getElementById('dbChip');
+    if (st.db && st.db.ok) { chip.className = 'badge ok'; chip.textContent = 'MySQL UP · answers grounded'; }
+    else { chip.className = 'badge bad'; chip.textContent = 'MySQL DOWN · answers = no'; }
+    document.getElementById('whoBox').innerHTML =
+      `<b>${fmt.esc(st.caller.subject)}</b><br>role: <code>${fmt.esc(st.caller.role)}</code><br>` +
+      `tier: <span class="badge">${fmt.esc(st.caller.tier)}</span>`;
+  } catch (e) {
+    document.getElementById('dbChip').className = 'badge bad';
+    document.getElementById('dbChip').textContent = 'gateway unreachable';
+  }
+  bubble('bot', {
+    reply: 'Namaste! Main MCP hospital assistant hoon. Main sirf hospital database se jawab deta hoon — ' +
+           'agar DB down ho to seedha "no" bolta hoon, kuch bhi invent nahi karta. Kya madad karun?',
+    generated: true, grounded: true, sources: []
+  });
+}
+
+function ask(text) {
+  document.getElementById('chatInput').value = text;
+  sendChat();
+}
+
+function bubble(who, res) {
+  const log = document.getElementById('chatLog');
+  const wrap = document.createElement('div');
+  const isUser = who === 'user';
+  let chips = '';
+  if (!isUser) {
+    const grounded = res.grounded ? '<span class="badge ok">grounded</span>' : '<span class="badge bad">not grounded</span>';
+    const gen = res.generated ? '' : '<span class="badge warn">no generation</span>';
+    const ans = res.answer === 'no' ? '<span class="badge bad">answer: no</span>' : '';
+    chips = `<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">${grounded}${gen}${ans}` +
+      (res.reason ? `<span class="badge">${fmt.esc(res.reason)}</span>` : '') + `</div>`;
+    if (res.sources && res.sources.length) {
+      chips += `<div class="small muted" style="margin-top:6px">sources: ` +
+        res.sources.map(s => '<code>' + fmt.esc(s) + '</code>').join(' ') + `</div>`;
+    }
+    if (res.latency_ms !== undefined) {
+      chips += `<div class="small muted">latency: ${fmt.n(res.latency_ms)} ms · router: ${fmt.esc(res.model || '')}</div>`;
+    }
+  }
+  wrap.style.cssText = 'max-width:92%;align-self:' + (isUser ? 'flex-end' : 'flex-start') + ';';
+  wrap.innerHTML = `
+    <div style="border-radius:16px;padding:12px 14px;white-space:pre-wrap;line-height:1.5;
+      ${isUser
+        ? 'background:var(--grad);color:#fff;'
+        : (res.generated === false
+            ? 'background:#fff4f4;border:1px solid #f3c6c8;color:#7a2e30;'
+            : 'background:var(--panel-2);border:1px solid var(--line);color:var(--ink);')}">
+      ${fmt.esc(res.reply || '')}${chips}
+    </div>`;
+  log.appendChild(wrap);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  bubble('user', {reply: text});
+  const res = await mcp('/api/chat', {method: 'POST', body: JSON.stringify({message: text})});
+  bubble('bot', res);
+}
+</script>
+{% endblock %}

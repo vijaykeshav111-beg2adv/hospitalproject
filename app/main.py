@@ -67,7 +67,17 @@ async def lifespan(app: FastAPI):
     scheduler = jobs.start_scheduler()
     log.info("%s started | database=%s | scheduler=%s", settings.app_name,
              db_health().get("backend"), bool(scheduler))
-    yield
+
+    # Start mounted FastMCP session managers while preserving the hospital lifespan.
+    from contextlib import AsyncExitStack
+    async with AsyncExitStack() as stack:
+        try:
+            mcp_gateway = getattr(app.state, "mcp_gateway", None)
+            if mcp_gateway is not None:
+                await stack.enter_async_context(mcp_gateway.router.lifespan_context(mcp_gateway))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("MCP gateway lifespan not started: %s", exc)
+        yield
     jobs.stop_scheduler()
     log.info("Shutdown complete")
 
@@ -112,6 +122,15 @@ def create_app() -> FastAPI:
     # ---- UI -------------------------------------------------------------
     app.include_router(web_router)
     app.include_router(legacy_ml.router)
+
+    # Additive MCP gateway; existing hospital and MCP-chat routes remain mounted.
+    try:
+        from mcp_layer.gateway import create_gateway
+        mcp_gateway = create_gateway(prefix="")
+        app.mount("/mcp", mcp_gateway)
+        app.state.mcp_gateway = mcp_gateway
+    except Exception as exc:  # noqa: BLE001 - never block the hospital app
+        log.warning("MCP gateway not mounted: %s", exc)
 
     static_dir = settings.storage_dir.parent / "app" / "static"
     if static_dir.exists():
