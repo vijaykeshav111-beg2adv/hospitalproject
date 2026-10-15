@@ -150,12 +150,68 @@ INTENT_PATTERNS: list[tuple[str, list[str]]] = [
     ("REVIEW", [r"\b(review|feedback|rating|complain about doctor)\b"]),
     ("DOCTOR_SEARCH", [r"\b(which doctor|best doctor|available doctor|doctor for|specialist|specialty|department)\b",
                       r"(re?co+m+e?nd|suggest|sujhao)\w*\b.*\b(doctors?|dr|specialist)\b"]),
+    # Questions about the hospital itself ("OPD timing?", "hospital phone?").
+    # The first two patterns skip messages that talk about booking.
+    ("HOSPITAL_INFO", [
+        r"^(?!.*\b(book|appointment|slot)\b).*\b(opd|hospital|clinic)\b.*\b(timings?|hours|open|opens|close|closed|address|location|located|phone|number|contact)\b",
+        r"^(?!.*\b(book|appointment|slot)\b).*\b(timings?|hours|address|location|phone number|contact number|contact details)\b.*\b(opd|hospital|clinic)\b",
+        r"\b(visiting (hours|time)|opd timings?|opd time|contact us)\b",
+        r"\b(where is|where are you|where's)\b.*\b(hospital|clinic)\b",
+    ]),
+    ("HELP", [
+        r"^\s*(help|menu|options?)\s*[?.!]*\s*$",
+        r"\b(what can you do|what do you do|how can you help|how do you work|kya kar sakte|aap kya kar)\b",
+    ]),
     ("BOOK_APPOINTMENT", [r"\b(book|appointment|slot|schedule (a )?visit|milna|dikhana|consult)\b"]),
     ("GREETING", [r"^\s*(hi+|hello+|hey+|helo|namaste|namaskar|good (morning|evening|afternoon))\b"]),
     ("THANKS", [r"\b(thanks|thank you|dhanyavad|shukriya)\b"]),
     ("AFFIRM", [r"^\s*(yes|y|haan|ha|ok|okay|confirm|sure|please do|book it|thik hai)\b"]),
     ("DENY", [r"^\s*(no|n|nahi|nahin|cancel it|not now|no thanks)\b"]),
 ]
+
+def hospital_info_reply(message: str) -> str:
+    """Answer address / phone / OPD timing questions.
+
+    The facts come ONLY from settings (.env). If a value is empty we say it
+    is not set up. We never make up an address, number or timing.
+    """
+    low = (message or "").lower()
+    wants_time = bool(re.search(r"\b(timings?|hours|open|opens|close|closed|time|opd)\b", low))
+    wants_address = bool(re.search(r"\b(address|location|located|where|kahan)\b", low))
+    wants_phone = bool(re.search(r"\b(phone|number|contact|call)\b", low))
+    if not (wants_time or wants_address or wants_phone):
+        wants_time = wants_address = wants_phone = True
+
+    lines: list[str] = []
+    missing: list[str] = []
+
+    if wants_time:
+        if settings.hospital_opd_hours:
+            lines.append(f"OPD timing: {settings.hospital_opd_hours}")
+        else:
+            missing.append("OPD timing")
+    if wants_address:
+        if settings.hospital_address:
+            city = settings.hospital_city
+            full = settings.hospital_address
+            if city and city.lower() not in full.lower():
+                full = f"{full}, {city}"
+            lines.append(f"Address: {full}")
+        else:
+            if settings.hospital_city:
+                lines.append(f"We are in {settings.hospital_city}.")
+            missing.append("street address")
+    if wants_phone:
+        if settings.hospital_phone:
+            lines.append(f"Hospital phone: {settings.hospital_phone}")
+        else:
+            missing.append("phone number")
+
+    if missing:
+        lines.append(f"I do not have the {' and '.join(missing)} saved yet, so I will not guess. "
+                     "Please ask our reception desk.")
+    return "\n".join(lines)
+
 
 SELECTION_RE = re.compile(r"^\s*(?:option\s*)?(\d{1,2})\s*$")
 
@@ -1804,12 +1860,39 @@ def handle_message(db: Session, payload, *, user=None) -> dict:
         return response
 
     # ------------------------------------------------------------------
+    # 8b. HELP and HOSPITAL FACTS
+    # These are normal questions, not symptoms, so they must not reach
+    # the concern / specialty router below.
+    # ------------------------------------------------------------------
+    if intent == "HELP":
+        response.update({
+            "reply": ("I am the AI front-desk assistant of Vijay Vargiya Group of Hospitals. I can:\n"
+                      "- find the right doctor when you tell me your problem\n"
+                      "- show live slots and book, reschedule or cancel an appointment\n"
+                      "- check your appointment status\n"
+                      "- share your reports, prescriptions and bills\n"
+                      "- connect you with our reception desk\n\n"
+                      "I cannot diagnose, suggest treatment or prescribe medicine - for that you need a doctor."),
+            "quick_replies": ["Book appointment", "Show my reports", "Payment status", "Talk to reception"],
+        })
+        _finish(db, conv, response, text, intent, confidence, user_msg, tools_used, started)
+        return response
+
+    if intent == "HOSPITAL_INFO":
+        response.update({
+            "reply": hospital_info_reply(text),
+            "quick_replies": ["Book appointment", "Talk to reception"],
+        })
+        _finish(db, conv, response, text, intent, confidence, user_msg, tools_used, started)
+        return response
+
+    # ------------------------------------------------------------------
     # 9. CONCERN CAPTURE + SPECIALTY ROUTING + DOCTOR MATCHING
     # ------------------------------------------------------------------
     non_concern = {"GREETING", "THANKS", "REVIEW", "EMERGENCY", "HUMAN_ESCALATION", "AFFIRM", "DENY",
                    "DECLINE", "CONFIRM_BOOKING", "CANCEL_APPOINTMENT", "RESCHEDULE_APPOINTMENT",
                    "APPOINTMENT_STATUS", "PRESCRIPTION_LOOKUP", "MEDICAL_FILE_LOOKUP", "PAYMENT_STATUS",
-                   "INVOICE_LOOKUP", "NOTIFICATION_REQUEST"}
+                   "INVOICE_LOOKUP", "NOTIFICATION_REQUEST", "HELP", "HOSPITAL_INFO"}
     if intent in {"PROVIDE_CONCERN", "BOOK_APPOINTMENT", "DOCTOR_SEARCH", "GENERAL_QUERY", "PROVIDE_NAME"} \
             or (conv.stage in {"AWAIT_CONCERN", "IDLE"} and intent not in non_concern):
         # "recommend a doctor" with no problem named, right after an upload:

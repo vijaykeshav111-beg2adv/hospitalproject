@@ -1,0 +1,91 @@
+﻿diff --git a/app/config.py b/app/config.py
+index 998e536..02e4ed5 100644
+--- a/app/config.py
++++ b/app/config.py
+@@ -147,7 +147,11 @@ class Settings:
+     smtp_password: str = os.getenv("SMTP_PASSWORD", "")
+     email_from: str = os.getenv("EMAIL_FROM", "no-reply@vijayvargiyahospital.in")
+     hospital_timezone: str = os.getenv("HOSPITAL_TIMEZONE", "Asia/Kolkata")
+-
++    # --- MCP services ---
++    mcp_hospital_url: str = os.getenv(
++        "MCP_HOSPITAL_URL",
++        "http://127.0.0.1:8010/mcp",
++    )
+     # --- AI: Groq only ---
+     ai_provider: str = "groq"
+     groq_api_key: str = os.getenv("GROQ_API_KEY", "")
+diff --git a/app/main.py b/app/main.py
+index 70ba198..5212f16 100644
+--- a/app/main.py
++++ b/app/main.py
+@@ -20,6 +20,7 @@ from .services import jobs
+ from .web import UILoginRequired, home_for_role
+ from .web import router as web_router
+ from .routers import legacy_ml
++from .routers import mcp_chat
+ 
+ logging.basicConfig(
+     level=logging.INFO,
+@@ -103,6 +104,7 @@ def create_app() -> FastAPI:
+         notifications.router, notifications.wa_router, ai.router, ai_files.router,
+         analytics.router,
+         analytics.admin_router, admin.router,
++        mcp_chat.router,
+     ]
+     for r in api_routers:
+         app.include_router(r, prefix="/api/v1")
+diff --git a/app/rbac.py b/app/rbac.py
+index a8721b5..0bbab5b 100644
+--- a/app/rbac.py
++++ b/app/rbac.py
+@@ -167,12 +167,12 @@ PAGE_ROLES: dict[str, tuple[str, ...]] = {
+     "/ui/patients":     ("DOCTOR", "RECEPTIONIST", "ADMIN"),
+     "/ui/appointments": ("PATIENT", "DOCTOR", "RECEPTIONIST", "ADMIN"),
+     "/ui/ai-chat":      ("PATIENT", "DOCTOR", "RECEPTIONIST", "ACCOUNTANT", "ADMIN"),
++    "/ui/mcp-chatbot":  ("PATIENT", "DOCTOR", "RECEPTIONIST", "ACCOUNTANT", "ADMIN"),
+     "/ui/ai-monitor":   ("ADMIN",),
+     "/ui/security":     ("ADMIN",),
+     "/ui/access":       ("ADMIN",),
+     "/ui/system":       ("ADMIN",),
+ }
+-
+ PAGE_LABELS: dict[str, str] = {
+     "/ui/super-admin":  "Super Admin dashboard - every role's data, security summary, system health",
+     "/ui/admin":        "Hospital dashboard - today's OPD, revenue, staff, reviews, analytics",
+@@ -185,6 +185,7 @@ PAGE_LABELS: dict[str, str] = {
+     "/ui/patients":     "Patient master - search, register, history",
+     "/ui/appointments": "Appointment list - today / upcoming / past",
+     "/ui/ai-chat":      "AI front desk chat",
++    "/ui/mcp-chatbot":  "MCP hospital chatbot",
+     "/ui/ai-monitor":   "AI monitor - conversations, routing, escalations, tools, safety",
+     "/ui/security":     "Audit log, login activity, sessions, security summary",
+     "/ui/access":       "This page - role x permission matrix",
+diff --git a/app/web.py b/app/web.py
+index 564c9b8..ca88213 100644
+--- a/app/web.py
++++ b/app/web.py
+@@ -457,4 +457,21 @@ def system(
+         request,
+         "system.html",
+         _ctx(request, "system"),
+-    )
+\ No newline at end of file
++    )
++# ------------------------------------------------------------------
++# MCP CHATBOT
++# ------------------------------------------------------------------
++
++@router.get("/mcp-chatbot", response_class=HTMLResponse)
++def mcp_chatbot(
++    request: Request,
++    _: CurrentUser = Depends(
++        page_guard(*rbac.PAGE_ROLES["/ui/mcp-chatbot"])
++    ),
++):
++    """Separate MCP chatbot page; existing AI front desk remains unchanged."""
++    return templates.TemplateResponse(
++        request,
++        "mcp_chatbot.html",
++        _ctx(request, "mcp_chatbot"),
++    )

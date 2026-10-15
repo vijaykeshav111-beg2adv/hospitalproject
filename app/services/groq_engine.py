@@ -378,6 +378,26 @@ def chat(db: Session, conv: models.AIConversation, patient: models.Patient | Non
                     safety_flag=safety_flag)
         return _response(conv, reply, "EMERGENCY", patient, safety, ["emergency_escalation"], esc, started)
 
+    # Medical advice and urgent symptoms are answered by fixed text, BEFORE the
+    # model is called. Before this fix the model spoke first and a disclaimer
+    # was added afterwards.
+    if safety.get("level") == "RESTRICTED":
+        reply = ("I cannot give medical advice, a diagnosis or medicines - only our doctors can do that "
+                 "in person. I can find the right specialist for you and book a slot. "
+                 "Would you like that?")
+        add_message(db, conv, "assistant", reply, intent="RESTRICTED", confidence=1.0,
+                    safety_flag=safety_flag)
+        return _response(conv, reply, "RESTRICTED", patient, safety, [], None, started)
+
+    if safety.get("level") == "HIGH":
+        esc = escalate(db, conv, "DOCTOR", "Urgent symptom detected", safety.get("matched"), patient)
+        reply = ("These symptoms need a doctor's attention soon. Please visit the hospital or call "
+                 "our reception desk now. I have alerted our team. If it gets worse or you feel "
+                 "unsafe, call 108 immediately.")
+        add_message(db, conv, "assistant", reply, intent="URGENT", confidence=1.0,
+                    safety_flag=safety_flag)
+        return _response(conv, reply, "URGENT", patient, safety, ["doctor_escalation"], esc, started)
+
     messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
     if patient:
         messages.append({"role": "system", "content": f"Authenticated patient context: patient_id={patient.id}, name={patient.full_name}. Use backend tools for all patient facts."})

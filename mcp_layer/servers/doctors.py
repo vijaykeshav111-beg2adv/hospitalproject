@@ -5,6 +5,7 @@ grounded availability window per doctor/date.
 """
 from __future__ import annotations
 
+import difflib
 from datetime import date as date_cls, datetime, timedelta
 
 from sqlalchemy import func, or_, select
@@ -53,18 +54,44 @@ def _get_doctor(db, doctor_id: int | None = None, name: str = ""):
     return _doctor_brief(doctor)
 
 
-@tool("search_doctors", "Search doctors by name / specialty keyword.")
-def _search_doctors(db, query: str = "", specialty_id: int | None = None, limit: int = 10):
-    limit = max(1, min(int(limit), 50))
+def _closest_specialty_name(db, text: str) -> str:
+    """Fix small typos: 'orthopedics' -> 'Orthopaedics', 'dermatolgy' -> 'Dermatology'."""
+    names = [n for n in db.scalars(select(models.Specialty.name).where(models.Specialty.is_active.is_(True)))]
+    lowered = {n.lower(): n for n in names}
+    close = difflib.get_close_matches(text.strip().lower(), list(lowered), n=1, cutoff=0.7)
+    return lowered[close[0]] if close else ""
+
+
+def _find_doctors(db, q: str, specialty_id, limit: int):
     stmt = select(models.Doctor).where(models.Doctor.is_active.is_(True))
-    q = (query or "").strip()
     if q:
-        like = f"%{q}%"
-        stmt = stmt.where(or_(models.Doctor.full_name.ilike(like),
-                              models.Doctor.qualifications.ilike(like)))
+        # If the text is exactly a department name, filter by that department only.
+        exact = db.scalar(select(models.Specialty).where(func.lower(models.Specialty.name) == q.lower()))
+        if exact is not None:
+            stmt = stmt.where(models.Doctor.specialty_id == exact.id)
+        else:
+            like = f"%{q}%"
+            stmt = (stmt.outerjoin(models.Specialty, models.Doctor.specialty_id == models.Specialty.id)
+                    .where(or_(models.Doctor.full_name.ilike(like),
+                               models.Doctor.qualifications.ilike(like),
+                               models.Specialty.name.ilike(like))))
     if specialty_id:
         stmt = stmt.where(models.Doctor.specialty_id == specialty_id)
-    rows = db.scalars(stmt.order_by(models.Doctor.rating_avg.desc()).limit(limit)).all()
+    return db.scalars(stmt.order_by(models.Doctor.rating_avg.desc()).limit(limit)).all()
+
+
+@tool("search_doctors", "Search doctors by name / specialty keyword (typos allowed).")
+def _search_doctors(db, query: str = "", specialty_id: int | None = None, limit: int = 10):
+    limit = max(1, min(int(limit), 50))
+    q = (query or "").strip()
+    rows = _find_doctors(db, q, specialty_id, limit)
+
+    # Nothing found: maybe the person misspelt a department name.
+    if not rows and q:
+        fixed = _closest_specialty_name(db, q)
+        if fixed:
+            rows = _find_doctors(db, fixed, specialty_id, limit)
+
     if not rows:
         return grounded_no(server=SPEC.key, tool="search_doctors", what="doctor")
     return [_doctor_brief(d) for d in rows]
@@ -89,6 +116,10 @@ def _list_specialties(db, query: str = ""):
     if q:
         stmt = stmt.where(models.Specialty.name.ilike(f"%{q}%"))
     rows = db.scalars(stmt.order_by(models.Specialty.name)).all()
+    if not rows and q:
+        fixed = _closest_specialty_name(db, q)
+        if fixed:
+            rows = db.scalars(select(models.Specialty).where(models.Specialty.name == fixed)).all()
     if not rows:
         return grounded_no(server=SPEC.key, tool="list_specialties", what="specialty")
     return [{"id": s.id, "code": s.code, "name": s.name,

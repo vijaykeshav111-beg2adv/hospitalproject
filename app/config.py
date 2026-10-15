@@ -147,6 +147,12 @@ class Settings:
     smtp_password: str = os.getenv("SMTP_PASSWORD", "")
     email_from: str = os.getenv("EMAIL_FROM", "no-reply@vijayvargiyahospital.in")
     hospital_timezone: str = os.getenv("HOSPITAL_TIMEZONE", "Asia/Kolkata")
+    # Facts the front-desk bot may tell patients. They come ONLY from .env.
+    # If a value is empty the bot says it is not set up - it never guesses.
+    hospital_city: str = os.getenv("HOSPITAL_CITY", "")
+    hospital_address: str = os.getenv("HOSPITAL_ADDRESS", "")
+    hospital_phone: str = os.getenv("HOSPITAL_PHONE", "")
+    hospital_opd_hours: str = os.getenv("HOSPITAL_OPD_HOURS", "")
     # --- MCP services ---
     mcp_hospital_url: str = os.getenv(
         "MCP_HOSPITAL_URL",

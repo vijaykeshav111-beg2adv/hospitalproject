@@ -68,7 +68,7 @@ class MCPSettings:
     # Optional Groq polish (wording only).  Disabled by default: answers are
     # built strictly from tool data, never from a free-form LLM.
     groq_api_key: str = field(default_factory=lambda: _env("GROQ_API_KEY", ""))
-    groq_model: str = field(default_factory=lambda: _env("GROQ_MODEL", "llama-3.3-70b-versatile"))
+    groq_model: str = field(default_factory=lambda: _env("GROQ_MODEL", "openai/gpt-oss-20b"))
 
     @property
     def server_ports(self) -> dict[str, int]:

@@ -93,8 +93,8 @@ async function boot() {
     document.getElementById('dbChip').textContent = 'gateway unreachable';
   }
   bubble('bot', {
-    reply: 'Namaste! Main MCP hospital assistant hoon. Main sirf hospital database se jawab deta hoon — ' +
-           'agar DB down ho to seedha "no" bolta hoon, kuch bhi invent nahi karta. Kya madad karun?',
+    reply: 'Namaste! I am the MCP hospital assistant. I answer only from the hospital database. ' +
+           'If the database is down I say no and never guess. How can I help? Type help to see what I can do.',
     generated: true, grounded: true, sources: []
   });
 }
